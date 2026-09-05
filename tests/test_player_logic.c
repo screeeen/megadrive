@@ -74,6 +74,21 @@ int main(void)
         CHECK(out.weaponLevel == 3, "L3 is capped, does not overflow");
     }
 
+    // Weapon-type pickup (L/W/H/F power-ups): same type levels up, a
+    // different type switches to it at L1.
+    {
+        WeaponState in = { WEAPON_LASER, 2 };
+        WeaponState out = Weapon_pickup(in, WEAPON_LASER);
+        CHECK(out.weapon == WEAPON_LASER, "picking up the held weapon keeps its type");
+        CHECK(out.weaponLevel == 3, "picking up the held weapon levels it up");
+    }
+    {
+        WeaponState in = { WEAPON_LASER, 3 };
+        WeaponState out = Weapon_pickup(in, WEAPON_FLAME);
+        CHECK(out.weapon == WEAPON_FLAME, "picking up a different weapon switches to it");
+        CHECK(out.weaponLevel == 1, "switching via pickup resets to L1, even from L3");
+    }
+
     if (failures == 0)
     {
         printf("PASS: all player_logic hit-resolution/weapon tests passed\n");

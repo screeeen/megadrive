@@ -3,7 +3,8 @@
 
 #include <genesis.h>
 
-#define PROJECTILE_POOL_SIZE 16
+// SPEC.md §24: ~16 player projectiles + up to 80 enemy bullets.
+#define PROJECTILE_POOL_SIZE 96
 #define PROJECTILE_SPRITE_W  8
 #define PROJECTILE_SPRITE_H  8
 
@@ -26,7 +27,8 @@ typedef enum
     PROJECTILE_TYPE_LASER_BIG, // Laser at weapon L3: SPEC.md §7 "visually larger but technically cheap"
     PROJECTILE_TYPE_WIDE,
     PROJECTILE_TYPE_HOMING,
-    PROJECTILE_TYPE_FLAME
+    PROJECTILE_TYPE_FLAME,
+    PROJECTILE_TYPE_ENEMY_BULLET // shared look for every enemy type (see enemy.c)
 } ProjectileType;
 
 typedef struct
@@ -79,5 +81,13 @@ void Projectile_poolUpdate(void);
 // Called on GAME_OVER so a mid-flight volley doesn't leak hardware sprites
 // into the next game (mirrors Player's own GAME_OVER cleanup).
 void Projectile_releaseAll(void);
+
+// Direct access to the pool for collision resolution (combat.c): small
+// embedded codebase, not worth an iterator abstraction over a fixed array
+// (AGENT.md §8: avoid unnecessary abstraction).
+Projectile* Projectile_getPool(void);
+
+// Deactivates and releases a single projectile (e.g. it hit something).
+void Projectile_release(Projectile* p);
 
 #endif // _PROJECTILE_H_

@@ -380,89 +380,85 @@ shoot_timer
 
 ## NS-M05-002 — Enemy pool
 
-* [ ] static
-* [ ] reuse
-* [ ] <=12 active
+* [x] static (Enemy pool[ENEMY_POOL_SIZE], enemy.c)
+* [x] reuse (Enemy_spawn scans for the first inactive slot)
+* [x] <=12 active (fixed array size; a full pool means Enemy_spawn returns NULL, budget not error)
 
 ## NS-M05-003 — Drone
 
-* [ ] HP1
-* [ ] fast
-* [ ] no fire
-* [ ] score 100
+* [x] HP1
+* [x] fast (velocity -3, fastest ground-speed enemy alongside Swarm)
+* [x] no fire (updateDrone does nothing but move)
+* [x] score 100
 
 ## NS-M05-004 — Fighter
 
-* [ ] HP2
-* [ ] side entry
-* [ ] formations
-* [ ] score 200
+* [x] HP2
+* [~] side entry — spawns at a fixed off-screen-right position via the M05 debug spawner, not a real formation/side-entry stage script (that's M07/M08)
+* [~] formations — same caveat: no Spawn Manager to place multiple Fighters in a real formation yet
+* [x] score 200
 
 ## NS-M05-005 — Bomber
 
-* [ ] HP4
-* [ ] slow
-* [ ] bursts
-* [ ] blocks path
-* [ ] score 500
+* [x] HP4
+* [x] slow (velocity -1, slowest of all 7)
+* [x] bursts (BulletPattern_burst: 3 shots at once)
+* [~] blocks path — Bomber has no scroll/obstacle system to "block" yet (no scrolling exists before M07); it does sit on screen a long time due to its low speed, which is the closest approximation available now
+* [x] score 500
 
 ## NS-M05-006 — Turret
 
-* [ ] HP3
-* [ ] fixed
-* [ ] aims player
-* [ ] score 300
+* [x] HP3
+* [x] fixed (velocityX=0; genuinely stationary since there's no scroll yet to distinguish "fixed relative to background" from "fixed on screen")
+* [x] aims player (BulletPattern_aimed toward the player's live x/y)
+* [x] score 300
 
 ## NS-M05-007 — Swarm
 
-* [ ] HP1
-* [ ] group movement
-* [ ] score 100
+* [x] HP1
+* [~] group movement — individual unit moves+fires correctly; "group" behavior (several spawned together, coordinated) needs the Spawn Manager (M07), not modeled by a single enemy's own update
+* [x] score 100
 
 ## NS-M05-008 — Charger
 
-* [ ] HP2
-* [ ] pause
-* [ ] aim
-* [ ] charge
+* [x] HP2
+* [x] pause (ENEMY_STATE_PAUSED, 60-frame stateTimer)
+* [x] aim (computed once, at the moment the pause ends, toward the player's position at that instant)
+* [x] charge (ENEMY_STATE_CHARGING at 2x Drone's speed in the aimed direction)
 
 ## NS-M05-009 — Shield
 
-* [ ] HP6
-* [ ] frontal resistance
-* [ ] vulnerable angle/opening
+* [x] HP6
+* [x] frontal resistance (damage ignored entirely while `vulnerable==false`)
+* [~] vulnerable angle/opening — implemented as a time-based vulnerable/shielded cycle (60 frames on, 90 off), not real directional/facing detection (no orientation concept exists in the engine yet); see PROGRESS.md decisions
 
 ## NS-M05-010 — Enemy bullets
 
-* [ ] pool
-* [ ] velocity
-* [ ] direction
-* [ ] collision
-* [ ] off-screen removal
-* [ ] maximum 80
+* [x] pool (reuses projectile.c's pool, grown to 96 slots to cover SPEC.md §24's ~16 player + ~80 enemy)
+* [x] velocity
+* [x] direction (bullet_pattern.c's LUT-based directions)
+* [x] collision (combat.c: enemy bullets vs. player)
+* [x] off-screen removal (Projectile_poolUpdate, unchanged from M03/M04)
+* [x] maximum 80 (shared 96-slot pool budget; not separately capped at exactly 80 for enemy-owned ones specifically, since the combined ceiling already bounds total pressure — see PROGRESS.md if a stricter per-owner cap is ever needed)
 
 ## NS-M05-011 — Bullet patterns
 
-Implement:
-
-```text
-diagonal
-circular
-top_bottom
-aimed
-burst
-wave
-cross
-combined
-```
+* [x] diagonal (implemented, visually inspectable, not yet fired by any M05 enemy)
+* [x] circular (implemented, visually inspectable, not yet fired by any M05 enemy)
+* [x] top_bottom (implemented, visually inspectable, not yet fired by any M05 enemy)
+* [x] aimed (Fighter, Turret — visually confirmed by user)
+* [x] burst (Bomber — visually confirmed by user)
+* [x] wave (Swarm — visually confirmed by user; simplified, no true sinusoidal path, see bullet_pattern.h)
+* [x] cross (Shield — visually confirmed by user)
+* [x] combined (implemented — aimed+cross — visually inspectable, not yet fired by any M05 enemy)
 
 ## NS-M05-012 — Enemy tests
 
-* [ ] all enemy types
-* [ ] bullets
-* [ ] patterns
-* [ ] collisions
-* [ ] limits
+* [x] all enemy types (enemy_logic's pure Enemy_applyDamage unit-tested 3/3; per-type behavior visually confirmed by user in BlastEm)
+* [x] bullets (visual: enemy bullets spawn, move, hit the player, despawn off-screen)
+* [x] patterns (visual, for the 4 actually fired — see NS-M05-011)
+* [x] collisions (visual: player bullets destroy enemies at the right HP threshold and add score; enemy bullets/contact damage the player)
+* [x] limits (12-enemy pool ceiling exists structurally; not deliberately driven to exactly 12 simultaneous during this milestone's testing — that's M17's stress-test job)
 
 ---
 
@@ -485,69 +481,71 @@ S
 
 ## NS-M06-002 — Power-up movement
 
-* [ ] slow fall
-* [ ] predictable
-* [ ] off-screen removal
-* [ ] player collision
+* [x] slow fall (POWERUP_FALL_SPEED, +1px/frame vertically)
+* [x] predictable (constant velocity, no randomness)
+* [x] off-screen removal (Powerup_poolUpdate)
+* [x] player collision (combat.c's resolvePlayerVsPowerups, AABB via collision_logic.c)
 
 ## NS-M06-003 — Weapon power-ups
 
-* [ ] Laser
-* [ ] Wide
-* [ ] Homing
-* [ ] Flame
+* [x] Laser (Player_pickupWeapon(player, WEAPON_LASER))
+* [x] Wide
+* [x] Homing
+* [x] Flame
 
 ## NS-M06-004 — P power-up
 
-* [ ] weapon level +1
-* [ ] maximum L3
+* [x] weapon level +1 (Player_levelUpWeapon)
+* [x] maximum L3 (Weapon_levelUp caps at 3, unit tested)
 
 ## NS-M06-005 — S power-up
 
-* [ ] temporary speed
-* [ ] duration
-* [ ] automatic restoration
+* [x] temporary speed (+2 px/frame, PLAYER_SPEED_BOOST_AMOUNT)
+* [x] duration (300 frames / 5s, not specified exactly in SPEC.md)
+* [x] automatic restoration (Player_update's speedBoostFrames countdown)
 
 ## NS-M06-006 — B power-up
 
-* [ ] bomb +1
-* [ ] maximum 3
+* [x] bomb +1 (Player_addBomb)
+* [x] maximum 3 (PLAYER_MAX_BOMBS)
 
 ## NS-M06-007 — 1UP
 
-* [ ] life +1
-* [ ] feedback
+* [x] life +1 (Player_addLife)
+* [x] feedback (immediately visible via the debug HUD's LIVES readout — no separate animation built, see PROGRESS.md)
 
 ## NS-M06-008 — Bomb
 
-* [ ] C activation
-* [ ] consume bomb
-* [ ] projectile neutralization
-* [ ] high damage
-* [ ] ~0.5 s invulnerability
-* [ ] explosion
+* [x] C activation (resolves NS-3's B/C double-booking for good)
+* [x] consume bomb (Player_useBomb, no-op if none held)
+* [x] projectile neutralization (all active enemy-owned projectiles released)
+* [x] high damage (10, exceeds every enemy's max HP including Shield's 6 — see PROGRESS.md)
+* [x] ~0.5 s invulnerability (30 frames, reuses PLAYER_STATE_INVULNERABLE)
+* [x] explosion — "BOMB!" text flash only; no particle/sprite explosion effect (that's M16 Effects/Polish's job)
 
 ## NS-M06-009 — Combo
 
-```text
-×1
-×2
-×3
-×4
-×5
-```
-
-* [ ] kills increase combo
-* [ ] timeout
-* [ ] reset
-* [ ] score multiplier
+* [x] x1 (default/reset state)
+* [x] x2..x5 (Combo_onKill increments, capped at 5)
+* [x] kills increase combo
+* [x] timeout (120 frames / 2s, not specified exactly in SPEC.md)
+* [x] reset (Combo_update resets to x1 when the timeout elapses)
+* [x] score multiplier (combat.c multiplies Score_add by Combo_getMultiplier() on every kill, including bomb kills)
 
 ## NS-M06-010 — System tests
 
-* [ ] power-ups
-* [ ] bomb
-* [ ] combo
-* [ ] limits
+* [x] power-ups (visual/emulator: all 8 confirmed by user; Weapon_pickup's pure logic unit-tested 2/2)
+* [x] bomb (visual/emulator: clears screen, damages Shield through its resistance, spends a bomb, shows feedback)
+* [x] combo (visual/emulator: multiplier rises on rapid kills, decays after a pause)
+* [x] limits (8-powerup pool ceiling exists structurally, same as M05's enemy/projectile limits; not deliberately driven to exactly 8 simultaneous — M17's stress-test job)
+
+## NS-M06-011 — Continue (not itemized here, but required by MILESTONES.md's M06 acceptance: "continue works")
+
+* [x] 3 continues per campaign (SPEC.md §26)
+* [x] GAME_OVER offers CONTINUE while any remain, otherwise goes to TITLE
+* [x] continuing resets weapon to L1 and grants exactly 1 bomb (SPEC.md §26)
+* [x] continuing preserves score (not specified either way in SPEC.md — see PROGRESS.md decision)
+* [~] "return to last checkpoint" — no checkpoint/stage system exists yet (M07); continuing resumes the current session instead
 
 ---
 

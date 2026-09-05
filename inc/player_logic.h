@@ -32,6 +32,10 @@ WeaponState Weapon_switchNext(WeaponState state);
 // Same-weapon pickup (SPEC.md §8): raises level by one, capped at 3.
 WeaponState Weapon_levelUp(WeaponState state);
 
+// Weapon-type pickup (L/W/H/F, SPEC.md §8): the same weapon already held
+// levels up; a different weapon switches to it at L1.
+WeaponState Weapon_pickup(WeaponState state, WeaponType picked);
+
 typedef struct
 {
     unsigned char weaponLevel; // 1..3

@@ -16,6 +16,11 @@
 #define PLAYER_WEAPON_LEVEL_MAX  3
 #define PLAYER_INVULN_FRAMES     90  // ~1.5s at 60Hz
 #define PLAYER_BLINK_PERIOD      8   // frames per visibility toggle while invulnerable
+#define PLAYER_MAX_BOMBS         3   // SPEC.md §9
+
+// S power-up (SPEC.md §10/NS-M06-005): temporary, automatically restored.
+#define PLAYER_SPEED_BOOST_AMOUNT 2
+#define PLAYER_SPEED_BOOST_FRAMES 300 // 5s at 60Hz, not specified exactly in SPEC.md
 
 typedef enum
 {
@@ -43,9 +48,9 @@ typedef struct
 
     PlayerState state;
     u16 invulnFrames;
+    u16 speedBoostFrames; // S power-up: counts down to 0, then speed reverts
 
     Sprite* sprite;
-    Sprite* debugHitboxSprite;
 } Player;
 
 void Player_init(Player* player, s16 x, s16 y);
@@ -64,8 +69,26 @@ bool Player_isDead(const Player* player);
 // B button (SPEC.md §5): advances to the next weapon type, reset to L1.
 void Player_switchWeapon(Player* player);
 
-// Same-weapon pickup (SPEC.md §8): +1 level, capped at 3. No power-up
-// system exists yet (M06); exposed for the M04 debug level-up trigger.
+// Same-weapon pickup (SPEC.md §8): +1 level, capped at 3. Used directly by
+// the P power-up (M06); was also the M03/M04 debug level-up trigger.
 void Player_levelUpWeapon(Player* player);
+
+// L/W/H/F power-up (SPEC.md §8): same weapon held levels it up, a
+// different one switches to it at L1.
+void Player_pickupWeapon(Player* player, WeaponType picked);
+
+// B power-up (SPEC.md §10): +1 bomb, capped at PLAYER_MAX_BOMBS.
+void Player_addBomb(Player* player);
+
+// Consumes one bomb; no-op if none held. Returns true if one was spent
+// (the caller — bomb.c — drives the actual clear/damage/explosion effect).
+bool Player_useBomb(Player* player);
+
+// S power-up (SPEC.md §10): temporary speed increase; Player_update()
+// restores the normal speed automatically once it expires.
+void Player_applySpeedBoost(Player* player);
+
+// 1UP power-up (SPEC.md §10): +1 life. No cap specified in SPEC.md.
+void Player_addLife(Player* player);
 
 #endif // _PLAYER_H_

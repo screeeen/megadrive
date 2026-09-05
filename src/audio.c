@@ -31,3 +31,8 @@ void Audio_update(void)
         PSG_setFrequency(0, melody[noteIndex]);
     }
 }
+
+void Audio_stop(void)
+{
+    PSG_setEnvelope(0, PSG_ENVELOPE_MIN);
+}

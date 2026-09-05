@@ -13,8 +13,6 @@ GameState GameState_computeNext(GameState current, bool startPressed)
             return STATE_PAUSE;
         case STATE_PAUSE:
             return STATE_GAME;
-        case STATE_GAME_OVER:
-            return STATE_TITLE;
         default:
             return current;
     }

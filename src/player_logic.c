@@ -18,6 +18,17 @@ WeaponState Weapon_levelUp(WeaponState state)
     return result;
 }
 
+WeaponState Weapon_pickup(WeaponState state, WeaponType picked)
+{
+    if (state.weapon == picked)
+        return Weapon_levelUp(state);
+
+    WeaponState result;
+    result.weapon = picked;
+    result.weaponLevel = 1;
+    return result;
+}
+
 PlayerHitResult Player_applyHit(PlayerHitState state)
 {
     PlayerHitResult result;

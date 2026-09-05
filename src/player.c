@@ -28,20 +28,13 @@ void Player_init(Player* player, s16 x, s16 y)
 
     player->state = PLAYER_STATE_NORMAL;
     player->invulnFrames = 0;
+    player->speedBoostFrames = 0;
 
     updateHitbox(player);
 
     PAL_setPalette(PAL1, nx01.palette->data, DMA);
     player->sprite = SPR_addSprite(&nx01, x, y, TILE_ATTR(PAL1, TRUE, FALSE, FALSE));
     SPR_setVisibility(player->sprite, VISIBLE);
-
-#if SHOW_DEBUG_HUD
-    PAL_setPalette(PAL3, debugHitbox.palette->data, DMA);
-    player->debugHitboxSprite = SPR_addSprite(&debugHitbox, player->hitboxX - 1, player->hitboxY - 1,
-                                               TILE_ATTR(PAL3, TRUE, FALSE, FALSE));
-#else
-    player->debugHitboxSprite = NULL;
-#endif
 }
 
 void Player_respawn(Player* player, s16 x, s16 y)
@@ -54,6 +47,8 @@ void Player_respawn(Player* player, s16 x, s16 y)
 
     player->weapon = WEAPON_VULCAN;
     player->weaponLevel = 1;
+    player->speed = PLAYER_MAX_SPEED;
+    player->speedBoostFrames = 0;
 
     player->state = PLAYER_STATE_INVULNERABLE;
     player->invulnFrames = PLAYER_INVULN_FRAMES;
@@ -113,10 +108,51 @@ void Player_levelUpWeapon(Player* player)
     player->weaponLevel = out.weaponLevel;
 }
 
+void Player_pickupWeapon(Player* player, WeaponType picked)
+{
+    WeaponState in = { player->weapon, player->weaponLevel };
+    WeaponState out = Weapon_pickup(in, picked);
+
+    player->weapon = out.weapon;
+    player->weaponLevel = out.weaponLevel;
+}
+
+void Player_addBomb(Player* player)
+{
+    if (player->bombs < PLAYER_MAX_BOMBS)
+        player->bombs++;
+}
+
+bool Player_useBomb(Player* player)
+{
+    if (player->bombs == 0)
+        return FALSE;
+
+    player->bombs--;
+    return TRUE;
+}
+
+void Player_applySpeedBoost(Player* player)
+{
+    player->speed = PLAYER_MAX_SPEED + PLAYER_SPEED_BOOST_AMOUNT;
+    player->speedBoostFrames = PLAYER_SPEED_BOOST_FRAMES;
+}
+
+void Player_addLife(Player* player)
+{
+    player->lives++;
+}
+
 void Player_update(Player* player, const InputState* input)
 {
     if (player->state == PLAYER_STATE_DEAD)
         return;
+
+    if (player->speedBoostFrames > 0)
+    {
+        if (--player->speedBoostFrames == 0)
+            player->speed = PLAYER_MAX_SPEED;
+    }
 
     u8 direction = 0;
     s16 vx = 0;
@@ -156,9 +192,4 @@ void Player_update(Player* player, const InputState* input)
     }
 
     SPR_setPosition(player->sprite, player->x, player->y);
-
-#if SHOW_DEBUG_HUD
-    if (player->debugHitboxSprite)
-        SPR_setPosition(player->debugHitboxSprite, player->hitboxX - 1, player->hitboxY - 1);
-#endif
 }

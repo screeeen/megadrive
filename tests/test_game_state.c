@@ -25,10 +25,10 @@ int main(void)
           "GAME stays GAME without START");
     CHECK(GameState_computeNext(STATE_BOSS, true) == STATE_BOSS,
           "states with no defined transition pass through unchanged");
-    CHECK(GameState_computeNext(STATE_GAME_OVER, true) == STATE_TITLE,
-          "GAME_OVER -> TITLE on START");
-    CHECK(GameState_computeNext(STATE_GAME_OVER, false) == STATE_GAME_OVER,
-          "GAME_OVER stays GAME_OVER without START");
+    CHECK(GameState_computeNext(STATE_GAME_OVER, true) == STATE_GAME_OVER,
+          "GAME_OVER has no START-driven transition here as of M06 (branches "
+          "to CONTINUE or TITLE depending on continues remaining, handled "
+          "outside computeNext, same reason as PLAYER_HIT below)");
     CHECK(GameState_computeNext(STATE_PLAYER_HIT, true) == STATE_PLAYER_HIT,
           "PLAYER_HIT has no START-driven transition (timer/lives-driven, handled outside computeNext)");
 

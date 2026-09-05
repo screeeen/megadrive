@@ -14,3 +14,5 @@ test:
 	./tests/test_player_logic
 	cc -std=c99 -Wall -Wextra -Iinc tests/test_collision_logic.c src/collision_logic.c -o tests/test_collision_logic
 	./tests/test_collision_logic
+	cc -std=c99 -Wall -Wextra -Iinc tests/test_enemy_logic.c src/enemy_logic.c -o tests/test_enemy_logic
+	./tests/test_enemy_logic

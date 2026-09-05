@@ -9,7 +9,7 @@ The agent MUST update it after every completed milestone.
 # CURRENT STATE
 
 ```text
-Current Milestone: M05
+Current Milestone: M07
 Status: NOT STARTED
 Overall Status: IN DEVELOPMENT
 ```
@@ -24,8 +24,8 @@ M01  Core Game Loop              [x]
 M02  Player                      [x]
 M03  Primary Weapon              [x]
 M04  Weapon System               [x]
-M05  Enemy Framework             [ ]
-M06  Power-ups / Bomb / Combo    [ ]
+M05  Enemy Framework             [x]
+M06  Power-ups / Bomb / Combo    [x]
 M07  Stage Data System           [ ]
 M08  Stage 1                     [ ]
 M09  Boss Framework              [ ]
@@ -55,35 +55,38 @@ Use:
 # CURRENT MILESTONE
 
 ```text
-ID: M05
-Name: Enemy Framework
+ID: M07
+Name: Stage Data System
 Status: NOT STARTED
 ```
 
 ## Current Objective
 
 ```text
-Give the game something to shoot at: a base Enemy entity/pool, and the
-two simplest types (Drone, Fighter per MILESTONES.md's usual first pair)
-per SPEC.md §11. This is also what finally lets M03/M04's deferred
-projectile -> enemy collision item close out for real.
+Replace M05/M06's debugSpawnEnemies() cycling placeholder with a real
+data-driven SpawnEvent system (TASKS.md NS-M07-001/002): stages described
+as const ROM tables (frame, type, x, y, variant), a Spawn Manager that
+walks them by comparing a cursor to the frame counter, checkpoints at
+~40%/~75%, and scroll speed as stage data.
 ```
 
 ## Current Work
 
 ```text
-Not started. M04 just completed.
+Not started. M06 just completed.
 ```
 
 ## Next Action
 
 ```text
-Read TASKS.md M05 tasks in full. Design a fixed-size Enemy pool mirroring
-projectile.c's pattern, wire collision_logic.c's already-tested AABB
-check between Projectile and Enemy hitboxes, and between Enemy and
-Player's hitbox (finally giving Player_hit() a real, non-debug caller).
-Decide whether the M02 B-damage / M03 C-levelup debug triggers get
-removed now that real hazards/pickups are closer, or wait for M06.
+Read TASKS.md M07 tasks in full. Design the SpawnEvent struct per
+NS-M07-001 (frame/type/x/y/variant), decide how "type" maps across the
+now-3 spawnable pools (Enemy/Powerup/obstacles-not-yet-implemented) —
+likely a category byte plus a sub-type, since Enemy and Powerup are
+different enums. This is also the natural point to retire
+debugSpawnEnemies() outright and give Fighter's "formations"/Swarm's
+"group movement" (both flagged partial in M05) their real behavior, since
+a real spawn timeline can place several enemies together on purpose.
 ```
 
 ---
@@ -91,15 +94,21 @@ removed now that real hazards/pickups are closer, or wait for M06.
 # VALIDATION STATUS
 
 ```text
-Build:       PASS   (make clean && make succeeds)
-Tests:       PASS   (make test: 8/8 game_state + 8/8 player_logic + 7/7 collision_logic assertions, host-native, no emulator)
+Build:       PASS   (make clean && make succeeds, zero warnings)
+Tests:       PASS   (make test: 8/8 game_state + 10/10 player_logic + 7/7 collision_logic + 3/3 enemy_logic assertions, host-native, no emulator)
 Emulator:    PASS   (BlastEm, built from source, boots the ROM cleanly)
-Visual:      PASS   (title, NX-01 placeholder sprite, FPS counter, debug hitbox/lives HUD,
-             damage blink, HIT!/GAME OVER flow, all 5 weapons with distinct
-             visuals/levels/switching confirmed by user on screen)
-Performance: UNKNOWN (never stress-tested; trivial scene only so far)
-Gameplay:    UNKNOWN (player + all 5 weapons exist; no enemies/stages implemented yet)
-Audio:       PASS   (PSG melody plays in GAME state, keeps playing through PAUSE)
+Visual:      PASS   (title, NX-01 sprite, full debug HUD (lives/weapon/level/
+             bombs/combo/score), damage blink, HIT!/GAME OVER/CONTINUE flow,
+             all 5 weapons, all 7 enemy types, all 8 power-ups, bomb, and
+             combo multiplier all confirmed by user on screen)
+Performance: UNKNOWN (never formally stress-tested; up to 12 enemies + up to
+             96 pooled projectiles + up to 8 power-ups now possible, heaviest
+             scene so far but not pushed to its limit)
+Gameplay:    UNKNOWN (player, all 5 weapons, all 7 enemy types, combat,
+             power-ups, bomb and combo exist; still no real stages/bosses)
+Audio:       PASS   (PSG melody plays in GAME state, keeps playing through
+             PAUSE, and is properly silenced on GAME_OVER — was left stuck
+             on a note before this milestone's polish pass)
 Campaign:    UNKNOWN
 ```
 
@@ -400,6 +409,164 @@ Notes: NS-M04-002's "pickup changes weapon" is still open — there is no
 pickup system before M06, same deferral shape as M03's collision item.
 ```
 
+## M05
+
+```text
+Status: PASS
+Date: 2026-09-05
+Summary: Closed out M03/M04's deferred "projectile -> enemy" item for
+real. All 7 enemy types (SPEC.md §11) implemented in enemy.c/enemy_logic.c
+(the latter a pure Enemy_applyDamage mirroring player_logic.c's pattern —
+unit tested), each in a fixed 12-slot pool (SPEC.md §24). Drone (HP1,
+fast, no fire), Fighter (HP2, aimed fire), Bomber (HP4, slow, 3-shot
+burst), Turret (HP3, stationary, aimed fire), Swarm (HP1, fast, a
+simplified oscillating shot), Charger (HP2, pauses then dashes straight
+at the player's position from the moment it commits), Shield (HP6, cycles
+vulnerable/shielded — damage is silently ignored while shielded, the
+simplification adopted for SPEC.md's "attack from an angle/opening"
+without real directional-facing mechanics).
+
+Added bullet_pattern.c implementing all 8 TASKS.md NS-M05-011 patterns as
+small LUT-based functions (no trig — SGDK has no FPU) over a new shared
+PROJECTILE_TYPE_ENEMY_BULLET. Only aimed/burst/wave/cross are actually
+fired by an enemy type right now; diagonal/circular/top_bottom/combined
+exist and are implemented but unexercised by any enemy yet — ready for
+M07/M08 stage design, not faked as "done" (AGENT.md §18).
+
+Added combat.c: player-bullets-vs-enemies (damage/destroy/score, using
+collision_logic.c's already-tested AABB check), enemy-bullets-vs-player,
+and enemy-contact-vs-player, all in one small module since they share the
+same box-overlap primitive. This is Player_hit()'s first real (non-debug)
+caller. Added score.c (Score_add/Score_get) — minimal but real; the full
+HUD format (SPEC.md §22) stays M14's job.
+
+Projectile pool grown from 16 to 96 slots (SPEC.md §24: ~16 player + ~80
+enemy). Enemy bullets and all 7 enemy sprites deliberately share ONE
+hardware palette line (PAL3): unlike weapons, several different enemy
+types can be on screen and firing at once, so the "reload per active
+type" trick from M04 doesn't work here. Retired the debug hitbox marker
+sprite (M02) to free PAL3 — its data (Player.hitboxX/Y) is unaffected,
+only the visual box is gone. All 8 placeholder PNGs (7 enemies + enemy
+bullet) were generated with the exact same 2 colors, remapped onto one
+reference palette image with `-remap`, verified byte-identical via
+`identify -verbose`'s Colormap output before committing to the approach
+— not assumed to work.
+
+No Spawn Manager exists yet (M07), so a small debug-only cycling spawner
+(game_state.c's debugSpawnEnemies) drops one enemy of the next type every
+90 frames at a fixed off-screen-right position. This is explicitly
+throwaway scaffolding for M05's own validation, not stage content — M07
+replaces it outright with real spawn-event data.
+
+Fixed a real bug before it shipped: several enemy shoot-timers used
+`if (--timer == 0 || timer > COOLDOWN)`, relying on intentional unsigned
+underflow (timer starts at 0) to fire on the first eligible frame. It
+worked, but was a fragile, confusing pattern for something meant to be
+deterministic and reviewable (AGENT.md §8) — rewritten as a plain
+`if (timer > 0) timer--; else { fire; timer = COOLDOWN; }` before this
+milestone was built, not after a bug report.
+
+Build:       PASS - `make clean && make`, zero warnings
+Tests:       PASS - `make test`: game_state/player_logic/collision_logic
+             unchanged + new enemy_logic (3/3: partial damage, lethal
+             damage, overkill damage never goes negative)
+Emulator:    PASS - boots cleanly in BlastEm, stable over an extended run
+             (20+s, long enough for the debug spawner to cycle every type
+             at least once)
+Visual:      PASS - confirmed by user on screen: all 7 types spawn, move,
+             and (where applicable) fire distinctly; each dies in the HP
+             count matching its spec; Shield visibly ignores damage while
+             shielded; score increments on kill (debug HUD); enemy
+             contact damages the player the same way enemy bullets do
+Performance: UNKNOWN - heaviest scene so far (up to 12 enemies + up to 96
+             projectiles theoretically possible) but not deliberately
+             stress-tested against that ceiling yet (M17's job)
+
+Notes: NS-M04-005's Homing "target selection" and NS-M04-003's Laser
+"pierce" are STILL open even though enemies now exist — Weapon.c's
+Homing/Laser firing code wasn't touched this milestone (out of scope;
+M05 was about enemies existing and being damageable, not revisiting M04's
+weapons). Tracked as a follow-up, not silently dropped.
+```
+
+## M06
+
+```text
+Status: PASS
+Date: 2026-09-05
+Summary: All 8 power-up types (SPEC.md §10) implemented in a new
+powerup.c pool (8 slots, falls+drifts slowly, off-screen removal), plus
+player_logic.c's new Weapon_pickup (unit tested: same weapon held levels
+up, a different one switches to it at L1 — mirrors Weapon_switchNext/
+Weapon_levelUp's pattern) and player.c wrappers for the non-weapon types
+(Player_addBomb capped at 3, Player_applySpeedBoost with automatic
+5-second restoration via a new Player.speedBoostFrames countdown,
+Player_addLife). Power-ups drop from enemy kills — every 3rd kill,
+cycling through all 8 types (no per-enemy drop table exists; that's
+stage-design territory, M07/M08) — rather than a separate debug spawner,
+since "enemies drop power-ups" already is the real mechanic.
+
+Added bomb.c: C (finally resolving NS-3's double-booking with M03's debug
+level-up trigger, which is retired now that real weapon/P pickups exist
+in-game) consumes one bomb and deals lethal damage to every active enemy
+— explicitly bypassing Shield's directional resistance, since SPEC.md §9
+frames a bomb as an emergency tool, not a normal attack a shield should
+block — clears every active enemy projectile, and grants ~0.5s of
+player invulnerability via the existing PLAYER_STATE_INVULNERABLE path.
+
+Added combo.c: a x1-x5 multiplier that increases per kill and resets
+after a 2-second no-kill timeout (not specified exactly in SPEC.md).
+combat.c now applies it to every kill's score, whether from a player
+bullet or a bomb.
+
+Finally gave the previously-unused STATE_CONTINUE (present since M01)
+real behavior, resolving MILESTONES.md M06's explicit "continue works"
+acceptance item that TASKS.md's own M06 task list didn't itemize (a gap
+between the two documents, not a TASKS.md checkbox I skipped): GAME_OVER
+now branches on a new continuesRemaining counter (3 per campaign,
+SPEC.md §26) — START offers CONTINUE while any remain (a brief
+"CONTINUE? N LEFT" beat, then gameplay resumes with weapon reset to L1,
+exactly one bomb, a fresh Player_init, and score deliberately preserved
+across the continue — not specified either way in SPEC.md, chosen to
+reward the run rather than punish it further), or goes straight to
+TITLE once continues are exhausted.
+
+Also fixed three things flagged directly during this session's testing
+(not part of any TASKS.md checklist, but real, user-reported bugs):
+removed the leftover M00-era "HELLO WORLD!" text from the GAME screen;
+added Audio_stop() (mutes PSG channel 0) called from GameOver_enter(),
+since a PSG channel latches its last note forever once nothing calls
+Audio_update() on it anymore — GAME_OVER previously left a stuck tone
+playing; added a SCORE readout to the GAME OVER screen, which previously
+showed none at all.
+
+Build:       PASS - `make clean && make`, zero warnings
+Tests:       PASS - `make test`: game_state/collision_logic/enemy_logic
+             unchanged, player_logic grew from 8 to 10 (+2 for
+             Weapon_pickup: same-weapon pickup levels up and keeps type,
+             different-weapon pickup switches type and resets to L1 even
+             from L3)
+Emulator:    PASS - boots cleanly in BlastEm, stable over an extended run
+Visual:      PASS - confirmed by user on screen: power-ups drop, fall,
+             and are collectible; each of the 8 types has its documented
+             effect (weapon switch/level-up for L/W/H/F, P levels the
+             held weapon, B raises the bomb count, S visibly speeds up
+             movement for its duration then reverts, 1UP raises the
+             lives count); C clears the screen, damages/kills enemies
+             (Shield included), shows "BOMB!", and spends a bomb; the
+             combo multiplier rises on rapid kills and decays back to x1
+             after a pause; GAME OVER offers CONTINUE while any remain
+             (resuming with L1/1 bomb/preserved score) and falls through
+             to TITLE once they're used up
+
+Notes: NS-M04-005 (Homing target selection) and NS-M04-003 (Laser
+pierce consumption details) remain open — still not this milestone's
+scope (weapon.c wasn't touched). NS-6 (no free palette line) is now
+fully realized rather than theoretical: power-ups share PAL3 with
+enemies/enemy bullets using the same byte-identical-palette technique
+as M05, verified the same way before relying on it.
+```
+
 ---
 
 # KNOWN ISSUES
@@ -407,10 +574,12 @@ pickup system before M06, same deferral shape as M03's collision item.
 | ID | Severity | Description | Status |
 | -- | -------- | ----------- | ------ |
 | NS-1 | — | B double-booking (M02 debug damage vs. M04 weapon switch) | RESOLVED at M04 — B now always switches weapons; the debug damage trigger was removed |
-| NS-2 | LOW | Palette budget: PAL2 now shared by all 5 projectile types (reloaded per active weapon at spawn time), not reserved solely for enemies as DEVELOPMENT_PLAN.md §2 originally sketched; only PAL0(text)/PAL1(player)/PAL3(debug hitbox, dev-only) are otherwise spoken for | OPEN — revisit at M05 when enemies need a line; debug hitbox's PAL3 is freed for real use once SHOW_DEBUG_HUD is turned off |
-| NS-3 | MEDIUM | C currently double-booked: M03's debug weapon-level-up trigger vs. M06's real job (bomb, SPEC.md §5) | OPEN — must resolve when M06 starts |
-| NS-4 | LOW | Homing (WEAPON_HOMING) flies straight — no enemy list exists yet to seek, so "target selection" (TASKS.md NS-M04-005) is a documented stub | OPEN — resolve at M05 once an enemy list exists to seek |
-| NS-5 | LOW | Laser's "pierces small enemies" (pierceRemaining field) is stored on Projectile but not consumed by anything — no collision resolution exists yet | OPEN — resolve at M05 alongside NS-M03-007 |
+| NS-2 | — | Palette budget for projectiles (PAL2) | RESOLVED at M05's shape — PAL2=player projectiles (reload-per-weapon), PAL3=all 7 enemies+enemy bullets (identical shared palette, since several can be active at once). All 4 hardware lines are now fully spoken for: PAL0=text, PAL1=player, PAL2=player bullets, PAL3=enemies/enemy bullets. Any future sprite category (power-ups, effects, background) has NO free line left — flagging as NS-6. |
+| NS-3 | — | C double-booking (M03 debug level-up vs. M06 bomb) | RESOLVED at M06 — C now always uses the bomb; the debug level-up trigger was removed (real P/weapon power-ups reach L2/L3 in-game now) |
+| NS-4 | LOW | Homing (WEAPON_HOMING) flies straight — weapon.c still wasn't revisited at M06 either (out of scope both times), so "target selection" (TASKS.md NS-M04-005) is still a stub | OPEN — resolve when weapon.c is next touched |
+| NS-5 | LOW | Laser's "pierces small enemies" (pierceRemaining field) is decremented by combat.c on a hit but nothing yet distinguishes "small" from other enemies — every enemy is currently pierceable | OPEN — revisit once enemy "size" is a meaningful concept (not yet modeled) |
+| NS-6 | — | No free hardware palette line for power-ups/effects/background | RESOLVED for power-ups at M06 — they share PAL3 with enemies/enemy bullets via the same identical-palette technique as M05. Effects (M16) and background tiles (M08+) still have no free line; will need the same treatment or a different one when they arrive |
+| NS-7 | LOW | Power-up drop scheme (every 3rd kill, cycling all 8 types) is a placeholder — no per-enemy/per-stage drop table exists (SPEC.md §27's per-stage power-up counts are a later, stage-design concern) | OPEN — resolve at M07/M08 once real stage data can specify drops |
 
 Severity:
 
@@ -443,6 +612,18 @@ Record important technical decisions made during development.
 | 2026-09-05 | Per-weapon numbers (Laser 9px/frame+pierce2, Wide's offset tables, Homing's 4-missile cap, Flame's 56px range) chosen, not specified in SPEC.md | Same rationale as M03's Vulcan numbers — SPEC.md gives relative behavior only |
 | 2026-09-05 | PAL2 reloaded per active weapon type at spawn time, rather than giving each of the 5 projectile types its own hardware line | Only 1 of 4 palette lines was free (PAL0/1/3 already spoken for) and only one weapon is ever held at once, so a rare few-frame miscoloring of an in-flight volley from the weapon just switched away from is an acceptable, documented tradeoff (see NS-2) |
 | 2026-09-05 | Homing flies straight (no seeking) and Laser's pierce count is stored but unused | No enemy list exists before M05 to seek or to pierce through; implemented as an honest stub rather than faked (AGENT.md §18) — see NS-4, NS-5 |
+| 2026-09-05 | All 7 enemy sprites + the shared enemy bullet sprite forced onto one byte-identical palette via ImageMagick `-remap` against a common reference, verified with `identify -verbose` before relying on it | Several different enemy types (and their bullets) can be on screen and animating simultaneously, unlike weapons where only one type is ever active — the M04 "reload palette per active type" trick does not work here |
+| 2026-09-05 | Retired the M02 debug hitbox marker sprite (visual box only; Player.hitboxX/Y data is untouched) | Freed PAL3, the only way to give all 7 enemy types a real color on a 4-line hardware palette budget |
+| 2026-09-05 | Shield's "frontal resistance / vulnerable angle" (SPEC.md §11) implemented as a time-based vulnerable/shielded cycle, not real directional-facing detection | No orientation/facing concept exists in the engine; a timer is the honest, simple approximation available now, documented rather than presented as the real mechanic |
+| 2026-09-05 | Enemy HP/score/cooldown numbers not given in SPEC.md (Fighter/Bomber/Turret/Swarm cooldowns, Charger's score, all bullet speeds) chosen here | Same rationale as M03/M04's weapon numbers — SPEC.md gives relative behavior and (mostly) HP/score, not timing |
+| 2026-09-05 | Enemy shoot-timer countdown pattern rewritten from `if (--timer==0 \|\| timer>COOLDOWN)` (relies on intentional u16 underflow) to a plain `if (timer>0) timer--; else {fire; timer=COOLDOWN;}` | The underflow version worked but was a fragile, confusing pattern for logic meant to be deterministic and easy to review (AGENT.md §8); fixed before shipping, not after a bug |
+| 2026-09-05 | Only 4 of TASKS.md NS-M05-011's 8 bullet patterns (aimed/burst/wave/cross) are fired by a real enemy; diagonal/circular/top_bottom/combined are implemented but unexercised | Each of the 7 enemy types' behavior is specified in SPEC.md §11 and doesn't call for all 8 patterns; the remaining 4 exist as tested building blocks for M07/M08 stage design rather than being forced into a type that doesn't call for them |
+| 2026-09-05 | Post-M05 user-requested fixes: removed the leftover "HELLO WORLD!" text from Game_enter(), added Audio_stop() (mutes PSG channel 0) called from GameOver_enter(), added a SCORE readout to the GAME OVER screen | "HELLO WORLD!" was M00-era placeholder text, dead weight once real gameplay existed; the PSG channel latches its last note indefinitely once nothing calls Audio_update() anymore, so GAME_OVER left a stuck tone playing until this was added; GAME OVER previously showed no score at all |
+| 2026-09-05 | Power-ups drop from enemy kills (every 3rd, cycling all 8 types) instead of a separate debug spawner | "Enemies drop power-ups" already is the real SPEC.md mechanic; no need for throwaway test scaffolding when the real trigger (a kill) already exists from M05 |
+| 2026-09-05 | Bomb damage (10) explicitly bypasses Shield's vulnerable/shielded cycle | SPEC.md §9 frames a bomb as an emergency, high-damage clear-the-screen tool, not a normal attack — a temporary directional shield blocking it would contradict that framing |
+| 2026-09-05 | Combo timeout (2s) and power-up S's boost duration (5s) chosen, not specified in SPEC.md | Same rationale as prior milestones' timing choices — SPEC.md gives relative/behavioral requirements, not frame counts |
+| 2026-09-05 | Continuing preserves score (not reset to 0) and resets to exactly 1 bomb (not 0, not full) | SPEC.md §26 only specifies weapon->L1 and "keeps one bomb" explicitly; score reset isn't mentioned either way — chose to preserve it since punishing an already-costly continue further isn't asked for anywhere in SPEC.md |
+| 2026-09-05 | GameState_computeNext's GAME_OVER->TITLE case (added at M01) removed; GAME_OVER's transition is now fully imperative in game_state.c | It must branch on continuesRemaining (CONTINUE vs. TITLE), state the pure function's simple (state, startPressed) signature can't express without overcomplicating it for one caller — same reasoning already applied to GAME->PLAYER_HIT since M02 |
 
 ---
 
@@ -451,9 +632,13 @@ Record important technical decisions made during development.
 ```text
 Target FPS: 60
 Observed FPS: on-screen counter now exists (VDP_showFPS, top-right, SHOW_DEBUG_HUD); no numeric reading recorded yet
-Max enemies: 0 (none implemented yet)
-Max projectiles: 16 (player pool; enemy bullets not implemented yet)
-Max sprites: 18 (player + debug hitbox marker + up to 16 pooled projectiles)
+Max enemies: 12 (ENEMY_POOL_SIZE, SPEC.md §24)
+Max projectiles: 96 (16 player + 80 enemy, shared pool, SPEC.md §24)
+Max powerups: 8 (POWERUP_POOL_SIZE, not specified in SPEC.md)
+Max sprites: 117 (1 player + up to 12 enemies + up to 96 projectiles + up
+  to 8 powerups) — theoretical pool ceiling, not a realistic simultaneous
+  count; debug spawner only ever has ~1 enemy actually firing at a time
+  so far
 Worst-case frame time: not measured
 ```
 
