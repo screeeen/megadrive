@@ -42,6 +42,19 @@ static AABB playerBox(const Player* player)
     return box;
 }
 
+static AABB bossBox(const Boss* boss)
+{
+    AABB box = { boss->x, boss->y, BOSS_SPRITE_W, BOSS_SPRITE_H };
+    return box;
+}
+
+static AABB bossVulnerablePointBox(const Boss* boss, u8 index)
+{
+    const VulnerablePoint* vp = &boss->vulnerablePoints[index];
+    AABB box = { (s16) (boss->x + vp->offsetX), (s16) (boss->y + vp->offsetY), vp->w, vp->h };
+    return box;
+}
+
 static void onEnemyKilled(u16 scoreGained, s16 x, s16 y)
 {
     Score_add((u16) (scoreGained * Combo_getMultiplier()));
@@ -167,10 +180,53 @@ static void resolvePlayerVsPowerups(Player* player)
     }
 }
 
-void Combat_resolveCollisions(Player* player)
+static void resolvePlayerBulletsVsBoss(Boss* boss)
+{
+    if (!Boss_isActive(boss))
+        return;
+
+    Projectile* projectiles = Projectile_getPool();
+
+    for (u16 i = 0; i < PROJECTILE_POOL_SIZE; i++)
+    {
+        Projectile* p = &projectiles[i];
+
+        if (!p->active || p->owner != PROJECTILE_OWNER_PLAYER)
+            continue;
+
+        for (u8 v = 0; v < boss->vulnerablePointCount; v++)
+        {
+            if (!Collision_overlaps(projectileBox(p), bossVulnerablePointBox(boss, v)))
+                continue;
+
+            if (Boss_hit(boss, p->damage))
+            {
+                if (p->pierceRemaining > 0)
+                    p->pierceRemaining--;
+                else
+                    Projectile_release(p);
+            }
+
+            break;
+        }
+    }
+}
+
+static void resolveBossContactVsPlayer(Boss* boss, Player* player)
+{
+    if (!Boss_isActive(boss))
+        return;
+
+    if (Collision_overlaps(bossBox(boss), playerBox(player)))
+        Player_hit(player); // no-op while already invulnerable/dead
+}
+
+void Combat_resolveCollisions(Player* player, Boss* boss)
 {
     resolvePlayerBulletsVsEnemies();
     resolveEnemyBulletsVsPlayer(player);
     resolveEnemyContactVsPlayer(player);
     resolvePlayerVsPowerups(player);
+    resolvePlayerBulletsVsBoss(boss);
+    resolveBossContactVsPlayer(boss, player);
 }

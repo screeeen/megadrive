@@ -16,6 +16,7 @@ typedef enum
     ENEMY_SWARM,
     ENEMY_CHARGER,
     ENEMY_SHIELD,
+    ENEMY_MINIBOSS, // SPEC.md §40.2: one per stage, tougher than any regular type
     ENEMY_TYPE_COUNT
 } EnemyType;
 
@@ -37,7 +38,7 @@ typedef struct
     s16 y;
     s16 velocityX;
     s16 velocityY;
-    u8 spriteW; // Bomber is 16x16; every other type is 8x8
+    u8 spriteW; // Bomber/Miniboss are 16x16; every other type is 8x8
     u8 spriteH;
 
     s16 hp;

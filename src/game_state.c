@@ -7,33 +7,69 @@
 #include "projectile.h"
 #include "enemy.h"
 #include "powerup.h"
+#include "boss.h"
 #include "combat.h"
 #include "combo.h"
 #include "bomb.h"
 #include "score.h"
+#include "stage.h"
+#include "spawn_manager.h"
+#include "scroll.h"
 #include "debug.h"
 
-#define PLAYER_HIT_FRAMES 60 // ~1s beat before the respawn/game-over decision
-#define CONTINUE_FRAMES   90 // ~1.5s "CONTINUE?" beat before gameplay resumes
+#define PLAYER_HIT_FRAMES   60 // ~1s beat before the respawn/game-over decision
+#define CONTINUE_FRAMES     90 // ~1.5s "CONTINUE?" beat before gameplay resumes
+#define STAGE_CLEAR_FRAMES  90
+#define NEXT_STAGE_FRAMES   60
 
 // SPEC.md §26: 3 initial continues per campaign.
 #define INITIAL_CONTINUES 3
 
 #define BOMB_FLASH_FRAMES 20 // how long the "BOMB!" feedback text stays up
 
-// No Spawn Manager/stage data exists yet (M07); this cycles through all 7
-// enemy types on a timer purely so M05/M06 have something to validate
-// against. Replaced outright once M07 lands real stage spawn data.
-#define DEBUG_SPAWN_INTERVAL 90
+// SPEC.md §22 Orbital Guardian: ~250 HP.
+#define ORBITAL_GUARDIAN_MAX_HP 250
+#define ORBITAL_GUARDIAN_SCORE  50000 // SPEC.md §23: boss = 50,000
+#define BOSS_SPAWN_X 340
+#define BOSS_SPAWN_Y 80
+
+// M08's real content. M07's `testStage` remains available (unused here) as
+// a fast, generic-system regression check — see PROGRESS.md.
+static const StageDef* currentStage = &stage1;
 
 static GameState state;
 static Player player;
+static Boss boss;
 static u16 hitTimer;
 static u16 continueTimer;
+static u16 stageClearTimer;
+static u16 nextStageTimer;
 static u16 bombFlashTimer;
 static u8 continuesRemaining;
-static u16 debugSpawnTimer;
-static EnemyType debugNextEnemyType;
+static s16 lastDrawnBossHp = -1; // -1 forces a redraw the first frame a boss is on screen
+
+// No boss HP feedback existed at all (not even for debugging) — with no way
+// to see the number go down, a "the boss never dies" report is impossible
+// to tell apart from a real bug. Simple text readout for now; a real
+// graphical bar is a later-milestone polish item.
+static void drawBossHp(s16 hp, s16 maxHp)
+{
+    if (hp == lastDrawnBossHp)
+        return;
+
+    lastDrawnBossHp = hp;
+
+    char buf[20];
+    sprintf(buf, "BOSS HP:%3d/%3d", hp, maxHp);
+    VDP_clearText(1, 1, 16);
+    VDP_drawText(buf, 1, 1);
+}
+
+static void clearBossHp(void)
+{
+    lastDrawnBossHp = -1;
+    VDP_clearText(1, 1, 16);
+}
 
 static void Title_enter(void)
 {
@@ -42,18 +78,31 @@ static void Title_enter(void)
     VDP_drawText("PRESS START", 10, 14);
 }
 
-// Shared by a fresh game (Game_enter) and resuming after a continue
-// (Continue_resume): every subsystem pool + the debug spawner.
-static void initSystems(void)
+// Clears every gameplay pool and starts (or resumes, from a checkpoint)
+// the stage timeline + scroll. Shared by every path that puts a Player on
+// screen with a clean slate: a fresh game, a continue, a mid-stage
+// respawn, and looping into the next stage attempt.
+static void resetGameplayPools(void)
 {
     Weapon_init();
-    Projectile_poolInit();
-    Enemy_poolInit();
-    Powerup_poolInit();
-    Combo_reset();
 
-    debugSpawnTimer = DEBUG_SPAWN_INTERVAL;
-    debugNextEnemyType = ENEMY_DRONE;
+    // Release before re-init: on respawn/next-stage there can still be
+    // active enemies/projectiles/powerups on screen (only the player died,
+    // or the stage timeline just ended — other entities weren't touched).
+    // The *_poolInit() functions only clear bookkeeping (active flags),
+    // they never call SPR_releaseSprite(); skipping the release step here
+    // orphaned their sprites in SGDK's sprite engine, which kept rendering
+    // them forever ("enemies stay painted on screen" after a hit).
+    Projectile_releaseAll();
+    Projectile_poolInit();
+    Enemy_releaseAll();
+    Enemy_poolInit();
+    Powerup_releaseAll();
+    Powerup_poolInit();
+    Boss_release(&boss);
+
+    Combo_reset();
+    Scroll_init(currentStage->backgroundId);
 }
 
 static void Game_enter(void)
@@ -62,27 +111,11 @@ static void Game_enter(void)
 
     Audio_init();
     Player_init(&player, 144, 96);
-    initSystems();
+    resetGameplayPools();
+    SpawnManager_start(currentStage);
     Score_reset();
 
     continuesRemaining = INITIAL_CONTINUES;
-}
-
-// Debug-only stand-in for M07's real Stage Data System: spawns the next
-// enemy type in sequence, off the right edge, at a Y that avoids exact
-// stacking. Not a real formation/spawn-timeline — just enough to exercise
-// every enemy type and combat.c's collisions during M05/M06.
-static void debugSpawnEnemies(void)
-{
-    if (--debugSpawnTimer > 0)
-        return;
-
-    debugSpawnTimer = DEBUG_SPAWN_INTERVAL;
-
-    s16 y = 20 + (debugNextEnemyType * 25);
-    Enemy_spawn(debugNextEnemyType, 300, y);
-
-    debugNextEnemyType = (EnemyType) ((debugNextEnemyType + 1) % ENEMY_TYPE_COUNT);
 }
 
 static void Pause_enter(void)
@@ -101,6 +134,19 @@ static void PlayerHit_enter(void)
     VDP_drawText("HIT!", 15, 12);
 }
 
+// SPEC.md §20: dying rewinds the stage timeline to the last checkpoint
+// passed (0 = stage start) rather than continuing exactly where the
+// player died — content between the checkpoint and the death point plays
+// again, the standard shmup convention.
+static void respawnAtCheckpoint(void)
+{
+    u8 checkpoints = SpawnManager_getCheckpointsPassed();
+
+    Player_respawn(&player, 144, 96);
+    resetGameplayPools();
+    SpawnManager_resumeFromCheckpoint(currentStage, checkpoints);
+}
+
 static void GameOver_enter(void)
 {
     // The player entity is fully rebuilt (fresh sprites) on the next
@@ -110,6 +156,7 @@ static void GameOver_enter(void)
     Projectile_releaseAll();
     Enemy_releaseAll();
     Powerup_releaseAll();
+    Boss_release(&boss);
 
     // The last note Audio_update() set otherwise keeps sounding forever —
     // PSG channels latch, they don't stop on their own.
@@ -147,8 +194,47 @@ static void Continue_resume(void)
     Audio_init();
     Player_init(&player, 144, 96);
     player.bombs = 1; // SPEC.md §26: "se mantiene una bomba"
-    initSystems();
+    resetGameplayPools();
+    SpawnManager_resumeFromCheckpoint(currentStage, SpawnManager_getCheckpointsPassed());
     // Score is deliberately NOT reset — kept across a continue.
+}
+
+static void StageClear_enter(void)
+{
+    stageClearTimer = STAGE_CLEAR_FRAMES;
+
+    // Same fix as GameOver_enter(): STATE_STAGE_CLEAR never calls
+    // Audio_update(), so whatever note was sounding when gameplay ended
+    // otherwise keeps sounding forever (PSG channels latch, they don't stop
+    // on their own).
+    Audio_stop();
+
+    VDP_drawText("STAGE CLEAR", 10, 10);
+}
+
+static void NextStage_enter(void)
+{
+    nextStageTimer = NEXT_STAGE_FRAMES;
+    VDP_clearText(10, 10, 11);
+    VDP_drawText("NEXT STAGE", 10, 10);
+}
+
+static void NextStage_resume(void)
+{
+    // Loops back into the same Stage 1 — Stage 2+ content is M10+'s job.
+    // Weapon/level/lives/score/bombs carry over; only the gameplay pools
+    // and the timeline/scroll reset for the new attempt.
+    VDP_clearPlane(BG_A, TRUE);
+
+    // StageClear_enter()'s Audio_stop() silences the PSG channel's envelope
+    // and nothing re-enables it — without this, gameplay would resume
+    // permanently muted (same "PSG channels latch" issue as the GAME_OVER
+    // and STAGE_CLEAR beep fixes, just missing on the "make sound come
+    // back" side instead of "make it stop").
+    Audio_init();
+    Player_respawn(&player, 144, 96);
+    resetGameplayPools();
+    SpawnManager_start(currentStage);
 }
 
 #if SHOW_DEBUG_HUD
@@ -214,10 +300,7 @@ void GameState_update(void)
             if (input->bPressed)
                 Player_switchWeapon(&player);
 
-            // C (SPEC.md §5): bomb. Resolves the M03/M06 double-booking —
-            // this button's only debug job (M03's weapon-level-up trigger)
-            // is retired now that real weapon/P power-ups exist to reach
-            // L2/L3 in-game.
+            // C (SPEC.md §5): bomb.
             if (input->cPressed && Bomb_use(&player))
                 bombFlashTimer = BOMB_FLASH_FRAMES;
 
@@ -226,13 +309,21 @@ void GameState_update(void)
             Enemy_poolUpdate(player.x, player.y);
             Powerup_poolUpdate();
             Combo_update();
-            Combat_resolveCollisions(&player);
-            debugSpawnEnemies();
+            Combat_resolveCollisions(&player, &boss);
+            SpawnManager_update();
+            Scroll_update(currentStage->scrollSpeed);
 
             if (Player_isDead(&player))
             {
                 state = STATE_PLAYER_HIT;
                 PlayerHit_enter();
+                break;
+            }
+
+            if (SpawnManager_isComplete())
+            {
+                state = STATE_BOSS;
+                Boss_spawn(&boss, BOSS_SPAWN_X, BOSS_SPAWN_Y, ORBITAL_GUARDIAN_MAX_HP, ORBITAL_GUARDIAN_SCORE);
                 break;
             }
 
@@ -252,6 +343,49 @@ void GameState_update(void)
 #endif
             break;
 
+        case STATE_BOSS:
+            Player_update(&player, input);
+
+            if (input->bPressed)
+                Player_switchWeapon(&player);
+
+            if (input->cPressed && Bomb_use(&player))
+                bombFlashTimer = BOMB_FLASH_FRAMES;
+
+            Weapon_update(&player, input);
+            Projectile_poolUpdate();
+            Enemy_poolUpdate(player.x, player.y); // phase 2's drone spawns need this to move/fire
+            Boss_update(&boss, player.x, player.y);
+            Combat_resolveCollisions(&player, &boss);
+            drawBossHp(boss.hp, boss.maxHp);
+
+            if (Player_isDead(&player))
+            {
+                state = STATE_PLAYER_HIT;
+                PlayerHit_enter();
+                clearBossHp();
+                break;
+            }
+
+            if (Boss_isEncounterOver(&boss))
+            {
+                Score_add((u16) (boss.score * Combo_getMultiplier()));
+                Combo_onKill();
+                Boss_release(&boss);
+                clearBossHp();
+                state = STATE_STAGE_CLEAR;
+                StageClear_enter();
+                break;
+            }
+
+            Audio_update();
+            SPR_update();
+
+#if SHOW_DEBUG_HUD
+            drawDebugHud();
+#endif
+            break;
+
         case STATE_PLAYER_HIT:
             Audio_update();
 
@@ -262,7 +396,7 @@ void GameState_update(void)
                 if (player.lives > 0)
                 {
                     state = STATE_GAME;
-                    Player_respawn(&player, 144, 96);
+                    respawnAtCheckpoint();
                 }
                 else
                 {
@@ -294,6 +428,22 @@ void GameState_update(void)
             {
                 state = STATE_GAME;
                 Continue_resume();
+            }
+            break;
+
+        case STATE_STAGE_CLEAR:
+            if (--stageClearTimer == 0)
+            {
+                state = STATE_NEXT_STAGE;
+                NextStage_enter();
+            }
+            break;
+
+        case STATE_NEXT_STAGE:
+            if (--nextStageTimer == 0)
+            {
+                state = STATE_GAME;
+                NextStage_resume();
             }
             break;
 

@@ -17,6 +17,8 @@ extern const SpriteDefinition enemyTurret;
 extern const SpriteDefinition enemySwarm;
 extern const SpriteDefinition enemyCharger;
 extern const SpriteDefinition enemyShield;
+extern const SpriteDefinition enemyMiniboss;
+extern const SpriteDefinition bossGuardian;
 extern const SpriteDefinition enemyBullet;
 extern const SpriteDefinition powerupLaser;
 extern const SpriteDefinition powerupWide;
@@ -26,5 +28,7 @@ extern const SpriteDefinition powerupP;
 extern const SpriteDefinition powerupBomb;
 extern const SpriteDefinition powerupSpeed;
 extern const SpriteDefinition powerup1up;
+extern const TileSet bgStar;
+extern const TileSet bgBuilding;
 
 #endif // _RES_RESOURCES_H_

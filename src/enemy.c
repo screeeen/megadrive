@@ -44,6 +44,12 @@
 #define SHIELD_VULN_ON   60 // frames vulnerable
 #define SHIELD_VULN_OFF  90 // frames shielded
 
+#define MINIBOSS_SPEED    -1
+#define MINIBOSS_HP        15  // not given numerically in SPEC.md; tougher than Shield's 6
+#define MINIBOSS_SCORE     5000
+#define MINIBOSS_COOLDOWN  50
+#define MINIBOSS_DAMAGE    2
+
 #define BULLET_SPEED     4
 
 static Enemy pool[ENEMY_POOL_SIZE];
@@ -58,6 +64,7 @@ static const SpriteDefinition* spriteFor(EnemyType type)
         case ENEMY_SWARM:   return &enemySwarm;
         case ENEMY_CHARGER: return &enemyCharger;
         case ENEMY_SHIELD:  return &enemyShield;
+        case ENEMY_MINIBOSS: return &enemyMiniboss;
         case ENEMY_DRONE:
         default:            return &enemyDrone;
     }
@@ -97,7 +104,7 @@ Enemy* Enemy_spawn(EnemyType type, s16 x, s16 y)
         e->stateTimer = 0;
         e->vulnerable = TRUE;
 
-        if (type == ENEMY_BOMBER)
+        if (type == ENEMY_BOMBER || type == ENEMY_MINIBOSS)
         {
             e->spriteW = 16;
             e->spriteH = 16;
@@ -123,6 +130,7 @@ Enemy* Enemy_spawn(EnemyType type, s16 x, s16 y)
                                  e->stateTimer = SHIELD_VULN_ON;
                                  e->vulnerable = TRUE;
                                  break;
+            case ENEMY_MINIBOSS: e->velocityX = MINIBOSS_SPEED; e->hp = MINIBOSS_HP; e->scoreValue = MINIBOSS_SCORE; break;
             default: e->velocityX = DRONE_SPEED; e->hp = DRONE_HP; e->scoreValue = DRONE_SCORE; break;
         }
 
@@ -234,6 +242,18 @@ static void updateShield(Enemy* e)
     }
 }
 
+static void updateMiniboss(Enemy* e)
+{
+    if (e->shootTimer > 0)
+    {
+        e->shootTimer--;
+        return;
+    }
+
+    BulletPattern_burst(e->x, e->y, BULLET_SPEED, MINIBOSS_DAMAGE);
+    e->shootTimer = MINIBOSS_COOLDOWN;
+}
+
 void Enemy_poolUpdate(s16 playerX, s16 playerY)
 {
     for (u16 i = 0; i < ENEMY_POOL_SIZE; i++)
@@ -252,6 +272,7 @@ void Enemy_poolUpdate(s16 playerX, s16 playerY)
             case ENEMY_SWARM:   updateSwarm(e);                    break;
             case ENEMY_CHARGER: updateCharger(e, playerX, playerY); break;
             case ENEMY_SHIELD:  updateShield(e);                   break;
+            case ENEMY_MINIBOSS: updateMiniboss(e);                 break;
             default: break;
         }
 

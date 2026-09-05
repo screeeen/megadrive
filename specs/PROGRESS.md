@@ -9,7 +9,7 @@ The agent MUST update it after every completed milestone.
 # CURRENT STATE
 
 ```text
-Current Milestone: M07
+Current Milestone: M09
 Status: NOT STARTED
 Overall Status: IN DEVELOPMENT
 ```
@@ -26,7 +26,7 @@ M03  Primary Weapon              [x]
 M04  Weapon System               [x]
 M05  Enemy Framework             [x]
 M06  Power-ups / Bomb / Combo    [x]
-M07  Stage Data System           [ ]
+M07  Stage Data System           [x]
 M08  Stage 1                     [ ]
 M09  Boss Framework              [ ]
 M10  Stages 2–3                  [ ]
@@ -55,38 +55,39 @@ Use:
 # CURRENT MILESTONE
 
 ```text
-ID: M07
-Name: Stage Data System
+ID: M08
+Name: Stage 1
 Status: NOT STARTED
 ```
 
 ## Current Objective
 
 ```text
-Replace M05/M06's debugSpawnEnemies() cycling placeholder with a real
-data-driven SpawnEvent system (TASKS.md NS-M07-001/002): stages described
-as const ROM tables (frame, type, x, y, variant), a Spawn Manager that
-walks them by comparing a cursor to the frame counter, checkpoints at
-~40%/~75%, and scroll speed as stage data.
+Replace M07's placeholder testStage with the real Orbital City (SPEC.md
+§16, §40.2): 38,400px length, real background/parallax art, the actual
+enemy pacing/density curve across the stage's 4 sections, a mini-boss,
+and the Orbital Guardian boss.
 ```
 
 ## Current Work
 
 ```text
-Not started. M06 just completed.
+Not started. M07 just completed.
 ```
 
 ## Next Action
 
 ```text
-Read TASKS.md M07 tasks in full. Design the SpawnEvent struct per
-NS-M07-001 (frame/type/x/y/variant), decide how "type" maps across the
-now-3 spawnable pools (Enemy/Powerup/obstacles-not-yet-implemented) —
-likely a category byte plus a sub-type, since Enemy and Powerup are
-different enums. This is also the natural point to retire
-debugSpawnEnemies() outright and give Fighter's "formations"/Swarm's
-"group movement" (both flagged partial in M05) their real behavior, since
-a real spawn timeline can place several enemies together on purpose.
+Read TASKS.md M08 tasks in full. M08 needs a working mini-boss and boss
+(NS-M08-007/008) but Boss Framework is M09 — the same kind of
+forward-reference TASKS.md/MILESTONES.md already had for M03's enemy
+collision and M04's Homing target selection. DEVELOPMENT_PLAN.md §3
+already flagged this (Phase B groups M08+M09 together for exactly this
+reason) — likely resolution: build enough of a generic boss (multi-phase
+HP gate, defeat -> STAGE_CLEAR) alongside Stage 1's content rather than
+strictly finishing M08 before starting M09, or build a minimal boss now
+and let M09 generalize it, mirroring how M05 was built once and M09 will
+reuse its patterns for every other boss.
 ```
 
 ---
@@ -97,18 +98,22 @@ a real spawn timeline can place several enemies together on purpose.
 Build:       PASS   (make clean && make succeeds, zero warnings)
 Tests:       PASS   (make test: 8/8 game_state + 10/10 player_logic + 7/7 collision_logic + 3/3 enemy_logic assertions, host-native, no emulator)
 Emulator:    PASS   (BlastEm, built from source, boots the ROM cleanly)
-Visual:      PASS   (title, NX-01 sprite, full debug HUD (lives/weapon/level/
-             bombs/combo/score), damage blink, HIT!/GAME OVER/CONTINUE flow,
-             all 5 weapons, all 7 enemy types, all 8 power-ups, bomb, and
-             combo multiplier all confirmed by user on screen)
+Visual:      PASS   (title, NX-01 sprite, full debug HUD, damage blink,
+             HIT!/GAME OVER/CONTINUE/STAGE CLEAR/NEXT STAGE flow, all 5
+             weapons, all 7 enemy types (including data-driven formations),
+             all 8 power-ups, bomb, combo multiplier, real BG_B parallax
+             scroll, and checkpoint-aware respawn all confirmed by user —
+             including a real bug the user caught and this milestone fixed
+             (orphaned enemy sprites after a hit, see M07 summary)
 Performance: UNKNOWN (never formally stress-tested; up to 12 enemies + up to
              96 pooled projectiles + up to 8 power-ups now possible, heaviest
              scene so far but not pushed to its limit)
 Gameplay:    UNKNOWN (player, all 5 weapons, all 7 enemy types, combat,
-             power-ups, bomb and combo exist; still no real stages/bosses)
+             power-ups, bomb, combo, and a data-driven stage/scroll/
+             checkpoint system exist; still no real Stage 1 content or bosses)
 Audio:       PASS   (PSG melody plays in GAME state, keeps playing through
              PAUSE, and is properly silenced on GAME_OVER — was left stuck
-             on a note before this milestone's polish pass)
+             on a note before M06's polish pass)
 Campaign:    UNKNOWN
 ```
 
@@ -567,6 +572,98 @@ enemies/enemy bullets using the same byte-identical-palette technique
 as M05, verified the same way before relying on it.
 ```
 
+## M07
+
+```text
+Status: PASS
+Date: 2026-09-05
+Summary: Replaced M05/M06's debugSpawnEnemies() cycling placeholder with
+a real data-driven system. stage.h defines SpawnEvent (frame/type/x/y/
+variant, per TASKS.md NS-M07-001 exactly) and StageDef (NS-M07-002:
+length/scrollSpeed/spawnEvents/checkpoints/boss-background-music IDs).
+`type` is a category byte (SPAWN_TYPE_ENEMY/SPAWN_TYPE_POWERUP) rather
+than the spawnable thing's own type, since EnemyType and PowerupType are
+separate enums with overlapping numeric ranges that don't fit in one
+byte together — `variant` holds the actual EnemyType/PowerupType value,
+disambiguated by `type`.
+
+spawn_manager.c walks a StageDef's events by comparing a frame cursor to
+each event's frame (NS-M07-003), calling Enemy_spawn/Powerup_spawn
+directly — pool-limit enforcement was already built into those (M05/M06),
+nothing new needed there. Checkpoints (NS-M07-004, ~40%/~75%) are tracked
+as "how many passed" and drive a real rewind-on-death: SPEC.md §20's
+convention (die -> resume from the last checkpoint, replaying content
+between it and the death point) is implemented via
+SpawnManager_resumeFromCheckpoint(), used by both mid-life respawn and
+continue.
+
+Added scroll.c: a real horizontal-scrolling BG_B plane (VDP_setPlaneSize
+64x32 + a repeating starfield TILESET + VDP_setHorizontalScroll each
+frame at the stage's data-driven scrollSpeed, SPEC.md §14's 2px normal).
+BG_A keeps hosting text/HUD undisturbed (VDP_drawText's default plane) —
+the two never conflict since they're independent hardware planes. The
+starfield tile shares PAL3 with enemies/power-ups (same identical-palette
+technique), since trying to match it to the player's own PAL1 palette
+proved unreliable via ImageMagick's `-unique-colors` (its color-order
+enumeration doesn't reliably match a PNG's real on-disk PLTE order —
+caught and abandoned before shipping, not after a visual bug).
+
+stage_data.c holds the one placeholder `testStage` this milestone
+validates the system with — NOT "Stage 1" (SPEC.md §16 Orbital City's
+real content/pacing/art is M08's job) — including two deliberate
+formations (2 Fighters, 3 Swarm, same frame each) to exercise
+NS-M07-003's "spawn enemies"/data-driven formations, finally closing the
+"formations"/"group movement" items M05 had flagged partial.
+
+Added STATE_STAGE_CLEAR and STATE_NEXT_STAGE real behavior (both existed
+unused since M01): reaching a stage's lengthFrames shows STAGE CLEAR then
+NEXT STAGE, then loops back into the same placeholder stage (no Stage 2+
+content exists yet, M10+) with score/lives/weapon/bombs preserved and
+only the gameplay pools + timeline + scroll reset — demonstrating
+NS-M07-007's completion/next-stage/entity-reset/state-preservation
+requirements even without new stage content to transition into.
+
+A real bug was caught during this session's testing (not from a TASKS.md
+checklist, a genuine defect): Enemy_poolInit()/Projectile_poolInit()/
+Powerup_poolInit() only ever cleared bookkeeping (active flags) — they
+never called SPR_releaseSprite(), correctly so for their ORIGINAL use
+(the very first call in Game_enter, when the pool is provably already
+empty). But this milestone's new resetGameplayPools() (used on respawn
+and next-stage) calls them when OTHER enemies/projectiles/power-ups can
+still be active — the player died, nothing else was cleared. Skipping the
+release step orphaned those sprites in SGDK's sprite engine, which kept
+rendering them forever: "enemies stay painted on screen after a hit," as
+the user described it. Fixed by having resetGameplayPools() call each
+pool's *_releaseAll() immediately before its *_poolInit(), so any still-
+active entities are properly released first regardless of caller.
+
+Build:       PASS - `make clean && make`, zero warnings
+Tests:       PASS - `make test`: unchanged (game_state/player_logic/
+             collision_logic/enemy_logic) — this milestone's new modules
+             (stage_data.c, spawn_manager.c, scroll.c) are all VDP/pool-
+             driving orchestration with no hardware-free logic worth
+             splitting out and testing natively, per the established
+             test-split rationale (DEVELOPMENT_PLAN.md §2)
+Emulator:    PASS - boots cleanly in BlastEm, stable over an extended run
+             (30+s, past the ~20s point the test stage completes and loops)
+Visual:      PASS - confirmed by user on screen: BG_B starfield visibly
+             scrolls left continuously; enemies spawn on a real schedule
+             including the 2-Fighter and 3-Swarm formations; STAGE
+             CLEAR -> NEXT STAGE -> stage restarts with score/lives/
+             weapon/bombs intact; dying past a checkpoint resumes content
+             from that checkpoint rather than the stage start; the
+             orphaned-sprite bug above was caught by the user, then
+             re-confirmed fixed after the patch
+
+Notes: "obstacles" (NS-M07-003's "spawn obstacles") has no implementation
+at all — no obstacle entity/concept exists anywhere in the engine yet.
+Not flagged as a defect: SPEC.md's obstacles (walls, doors, asteroids)
+are stage-specific art/geometry (§18 Space Colony, §19 Asteroid Belt)
+that don't appear in Stage 1 (§16 Orbital City) at all, so there's
+nothing for M08 to need yet either — deferred to whichever later stage
+milestone first requires one.
+```
+
 ---
 
 # KNOWN ISSUES
@@ -578,8 +675,11 @@ as M05, verified the same way before relying on it.
 | NS-3 | — | C double-booking (M03 debug level-up vs. M06 bomb) | RESOLVED at M06 — C now always uses the bomb; the debug level-up trigger was removed (real P/weapon power-ups reach L2/L3 in-game now) |
 | NS-4 | LOW | Homing (WEAPON_HOMING) flies straight — weapon.c still wasn't revisited at M06 either (out of scope both times), so "target selection" (TASKS.md NS-M04-005) is still a stub | OPEN — resolve when weapon.c is next touched |
 | NS-5 | LOW | Laser's "pierces small enemies" (pierceRemaining field) is decremented by combat.c on a hit but nothing yet distinguishes "small" from other enemies — every enemy is currently pierceable | OPEN — revisit once enemy "size" is a meaningful concept (not yet modeled) |
-| NS-6 | — | No free hardware palette line for power-ups/effects/background | RESOLVED for power-ups at M06 — they share PAL3 with enemies/enemy bullets via the same identical-palette technique as M05. Effects (M16) and background tiles (M08+) still have no free line; will need the same treatment or a different one when they arrive |
-| NS-7 | LOW | Power-up drop scheme (every 3rd kill, cycling all 8 types) is a placeholder — no per-enemy/per-stage drop table exists (SPEC.md §27's per-stage power-up counts are a later, stage-design concern) | OPEN — resolve at M07/M08 once real stage data can specify drops |
+| NS-6 | — | No free hardware palette line for power-ups/effects/background | RESOLVED for power-ups AND background at M06/M07 — power-ups (M06) and the M07 starfield tile both share PAL3 with enemies/enemy bullets via the same identical-palette technique as M05. Effects (M16) and Stage 1's real background art (M08) still have no free line of their own; will need the same treatment (or a different one) when they arrive |
+| NS-7 | LOW | Power-up drop scheme (every 3rd kill, cycling all 8 types) is still a placeholder even after M07 — SpawnEvent can place power-ups directly now (stage_data.c doesn't, testStage only drops via kills), but no per-enemy/per-stage drop table exists (SPEC.md §27's per-stage counts are stage-design content) | OPEN — resolve at M08 once real Stage 1 data can specify drops directly as SpawnEvents |
+| NS-8 | MEDIUM | M08 (Stage 1) needs a working mini-boss and boss (NS-M08-007/008), but Boss Framework is M09 — a forward-reference in TASKS.md/MILESTONES.md's own ordering, the same shape as M03's enemy-collision and M04's Homing-target-selection gaps | OPEN — must decide an approach when M08 starts (see PROGRESS.md's M08 "Next Action") |
+| NS-9 | LOW | "spawn obstacles" (NS-M07-003) has no implementation — no obstacle entity/concept exists in the engine | OPEN — not needed by Stage 1 (Orbital City, SPEC.md §16) either; deferred to whichever stage first requires one (Space Colony/Asteroid Belt, §18-19) |
+| NS-10 | LOW | Checkpoint respawn/continue reset BG_B's scroll position to 0 (Scroll_init() re-zeroes it) rather than resuming at the pixel offset matching the checkpoint's frame | OPEN — cosmetic only (the background is a seamlessly-repeating starfield, so a scroll-position jump isn't visible); revisit if a non-repeating background ever makes the seam visible |
 
 Severity:
 
@@ -624,6 +724,11 @@ Record important technical decisions made during development.
 | 2026-09-05 | Combo timeout (2s) and power-up S's boost duration (5s) chosen, not specified in SPEC.md | Same rationale as prior milestones' timing choices — SPEC.md gives relative/behavioral requirements, not frame counts |
 | 2026-09-05 | Continuing preserves score (not reset to 0) and resets to exactly 1 bomb (not 0, not full) | SPEC.md §26 only specifies weapon->L1 and "keeps one bomb" explicitly; score reset isn't mentioned either way — chose to preserve it since punishing an already-costly continue further isn't asked for anywhere in SPEC.md |
 | 2026-09-05 | GameState_computeNext's GAME_OVER->TITLE case (added at M01) removed; GAME_OVER's transition is now fully imperative in game_state.c | It must branch on continuesRemaining (CONTINUE vs. TITLE), state the pure function's simple (state, startPressed) signature can't express without overcomplicating it for one caller — same reasoning already applied to GAME->PLAYER_HIT since M02 |
+| 2026-09-05 | SpawnEvent.type is a category byte (SPAWN_TYPE_ENEMY/POWERUP), not the spawnable thing's own enum value | EnemyType and PowerupType are separate enums with overlapping numeric ranges; `variant` holds the actual value, disambiguated by `type` — matches TASKS.md NS-M07-001's literal field names without inventing new ones |
+| 2026-09-05 | Checkpoint rewind (die -> resume from last checkpoint) replays content between the checkpoint and the death point, rather than resuming exactly where the player died | The conventional shmup reading of SPEC.md §20; also the only reading that keeps the SpawnEvent cursor meaningful (a checkpoint IS a frame position in the timeline) |
+| 2026-09-05 | Background starfield tile shares PAL3 (enemies/power-ups) rather than the player's PAL1 | Attempting to match nx01.png's real palette order via ImageMagick's `-unique-colors` produced a DIFFERENT order than the file's actual on-disk PLTE (confirmed via `identify -verbose` on the same file, two different orderings) — caught before shipping a broken-looking background, not after; PAL3's technique was already proven working three times over (M05 enemies, M05 enemy bullets, M06 power-ups) |
+| 2026-09-05 | Stage completion loops back into the same placeholder testStage (no STAGE 2 content) rather than ending the session | Demonstrates NS-M07-007's transition/reset/state-preservation requirements now, without needing Stage 2+ content that belongs to M10+ |
+| 2026-09-05 | resetGameplayPools() now calls *_releaseAll() before *_poolInit() for projectiles/enemies/power-ups | Bug fix: the *_poolInit() functions only ever cleared bookkeeping, never released sprites — safe for their original call site (Game_enter, pool provably empty) but not for respawn/next-stage, where other entities can still be active. Caught by the user during M07 testing ("enemies stay painted on screen after a hit") |
 
 ---
 

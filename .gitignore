@@ -12,3 +12,4 @@ tests/test_game_state
 tests/test_player_logic
 tests/test_collision_logic
 tests/test_enemy_logic
+tests/test_boss_logic

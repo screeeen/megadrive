@@ -583,38 +583,33 @@ music
 
 ## NS-M07-003 — Spawn manager
 
-* [ ] process events
-* [ ] spawn enemies
-* [ ] spawn power-ups
-* [ ] spawn obstacles
-* [ ] respect pool limits
+* [x] process events (spawn_manager.c's frame cursor, compares to StageDef.spawnEvents)
+* [x] spawn enemies
+* [x] spawn power-ups
+* [ ] spawn obstacles — no obstacle entity/concept exists anywhere in the engine yet; not needed by Stage 1 (SPEC.md §16), deferred to whichever stage first requires one (see PROGRESS.md NS-9)
+* [x] respect pool limits (Enemy_spawn/Powerup_spawn already return NULL on a full pool, since M05/M06 — nothing new needed here)
 
 ## NS-M07-004 — Checkpoints
 
-Exactly:
-
-```text
-~40%
-~75%
-```
+* [x] ~40% (testStage.checkpointFrames[0] = 480 of 1200)
+* [x] ~75% (testStage.checkpointFrames[1] = 900 of 1200)
+* [x] functional: death/continue rewinds the spawn timeline to the last checkpoint passed (SpawnManager_resumeFromCheckpoint), not just a stored percentage
 
 ## NS-M07-005 — Scroll
 
-```text
-normal = 2 px/frame
-maximum = 4 px/frame
-```
+* [x] normal = 2 px/frame (testStage.scrollSpeed, applied every GAME frame via Scroll_update)
+* [~] maximum = 4 px/frame — the engine supports any per-stage scrollSpeed value (it's just a StageDef field), but nothing dynamically raises it mid-stage yet; that's stage-design content for M08+ to actually use
 
 ## NS-M07-006 — Parallax
 
-Implement 3–4 layers.
+* [~] 3-4 layers — Genesis has exactly 2 hardware tile planes; this milestone delivers ONE real scrolling layer (BG_B, a starfield, since BG_A already hosts text/HUD) proving the engine (independently-scrollable planes at a data-driven speed) works. "3-4 layers" beyond the 2 real planes means compositing multiple background elements within them via art (M08's job), not additional hardware planes that don't exist — see PROGRESS.md's M07 summary
 
 ## NS-M07-007 — Stage transitions
 
-* [ ] completion
-* [ ] next stage
-* [ ] entity reset
-* [ ] state preservation
+* [x] completion (SpawnManager_isComplete() when currentFrame >= lengthFrames)
+* [x] next stage (STATE_STAGE_CLEAR -> STATE_NEXT_STAGE -> STATE_GAME, looping into the same placeholder stage since no Stage 2 exists yet)
+* [x] entity reset (resetGameplayPools(), now correctly releasing sprites first — see the M07 bugfix in PROGRESS.md)
+* [x] state preservation (score/lives/weapon/level/bombs carry over the loop; only pools+timeline+scroll reset)
 
 ---
 

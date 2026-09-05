@@ -16,3 +16,5 @@ test:
 	./tests/test_collision_logic
 	cc -std=c99 -Wall -Wextra -Iinc tests/test_enemy_logic.c src/enemy_logic.c -o tests/test_enemy_logic
 	./tests/test_enemy_logic
+	cc -std=c99 -Wall -Wextra -Iinc tests/test_boss_logic.c src/boss_logic.c -o tests/test_boss_logic
+	./tests/test_boss_logic
