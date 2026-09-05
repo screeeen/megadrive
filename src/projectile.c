@@ -2,12 +2,38 @@
 #include "resources.h"
 
 static Projectile pool[PROJECTILE_POOL_SIZE];
+static ProjectileType loadedPaletteType;
+static bool paletteLoaded;
+
+static const SpriteDefinition* spriteFor(ProjectileType type)
+{
+    switch (type)
+    {
+        case PROJECTILE_TYPE_LASER:     return &bulletLaser;
+        case PROJECTILE_TYPE_LASER_BIG: return &bulletLaserBig;
+        case PROJECTILE_TYPE_WIDE:      return &bulletWide;
+        case PROJECTILE_TYPE_HOMING:    return &bulletHoming;
+        case PROJECTILE_TYPE_FLAME:     return &bulletFlame;
+        case PROJECTILE_TYPE_VULCAN:
+        default:                        return &bulletVulcan;
+    }
+}
 
 static void release(Projectile* p)
 {
     p->active = FALSE;
     SPR_releaseSprite(p->sprite);
     p->sprite = NULL;
+}
+
+static void ensurePalette(ProjectileType type)
+{
+    if (paletteLoaded && loadedPaletteType == type)
+        return;
+
+    PAL_setPalette(PAL2, spriteFor(type)->palette->data, DMA);
+    loadedPaletteType = type;
+    paletteLoaded = TRUE;
 }
 
 void Projectile_poolInit(void)
@@ -18,12 +44,15 @@ void Projectile_poolInit(void)
         pool[i].sprite = NULL;
     }
 
-    PAL_setPalette(PAL2, bulletVulcan.palette->data, DMA);
+    paletteLoaded = FALSE;
 }
 
 Projectile* Projectile_spawn(s16 x, s16 y, s16 vx, s16 vy, u8 damage,
-                              ProjectileOwner owner, ProjectileType type)
+                              ProjectileOwner owner, ProjectileType type,
+                              s16 rangeRemaining, u8 pierceRemaining)
 {
+    ensurePalette(type);
+
     for (u16 i = 0; i < PROJECTILE_POOL_SIZE; i++)
     {
         Projectile* p = &pool[i];
@@ -39,12 +68,27 @@ Projectile* Projectile_spawn(s16 x, s16 y, s16 vx, s16 vy, u8 damage,
         p->damage = damage;
         p->owner = owner;
         p->type = type;
-        p->sprite = SPR_addSprite(&bulletVulcan, x, y, TILE_ATTR(PAL2, TRUE, FALSE, FALSE));
+        p->rangeRemaining = rangeRemaining;
+        p->pierceRemaining = pierceRemaining;
+        p->sprite = SPR_addSprite(spriteFor(type), x, y, TILE_ATTR(PAL2, TRUE, FALSE, FALSE));
 
         return p;
     }
 
     return NULL;
+}
+
+u8 Projectile_countActiveOfType(ProjectileType type)
+{
+    u8 count = 0;
+
+    for (u16 i = 0; i < PROJECTILE_POOL_SIZE; i++)
+    {
+        if (pool[i].active && pool[i].type == type)
+            count++;
+    }
+
+    return count;
 }
 
 void Projectile_poolUpdate(void)
@@ -58,6 +102,18 @@ void Projectile_poolUpdate(void)
 
         p->x += p->velocityX;
         p->y += p->velocityY;
+
+        if (p->rangeRemaining != PROJECTILE_RANGE_UNLIMITED)
+        {
+            s16 traveled = abs(p->velocityX) + abs(p->velocityY);
+            p->rangeRemaining -= traveled;
+
+            if (p->rangeRemaining <= 0)
+            {
+                release(p);
+                continue;
+            }
+        }
 
         if (p->x < -PROJECTILE_SPRITE_W || p->x > 320 ||
             p->y < -PROJECTILE_SPRITE_H || p->y > 224)

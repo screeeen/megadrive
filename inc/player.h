@@ -19,15 +19,6 @@
 
 typedef enum
 {
-    WEAPON_VULCAN,
-    WEAPON_LASER,
-    WEAPON_WIDE,
-    WEAPON_HOMING,
-    WEAPON_FLAME
-} WeaponType;
-
-typedef enum
-{
     PLAYER_STATE_NORMAL,
     PLAYER_STATE_INVULNERABLE,
     PLAYER_STATE_DEAD
@@ -69,5 +60,12 @@ void Player_hit(Player* player);
 void Player_respawn(Player* player, s16 x, s16 y);
 
 bool Player_isDead(const Player* player);
+
+// B button (SPEC.md §5): advances to the next weapon type, reset to L1.
+void Player_switchWeapon(Player* player);
+
+// Same-weapon pickup (SPEC.md §8): +1 level, capped at 3. No power-up
+// system exists yet (M06); exposed for the M04 debug level-up trigger.
+void Player_levelUpWeapon(Player* player);
 
 #endif // _PLAYER_H_

@@ -1,5 +1,23 @@
 #include "player_logic.h"
 
+WeaponState Weapon_switchNext(WeaponState state)
+{
+    WeaponState result;
+    result.weapon = (WeaponType) ((state.weapon + 1) % WEAPON_COUNT);
+    result.weaponLevel = 1;
+    return result;
+}
+
+WeaponState Weapon_levelUp(WeaponState state)
+{
+    WeaponState result = state;
+
+    if (result.weaponLevel < 3)
+        result.weaponLevel++;
+
+    return result;
+}
+
 PlayerHitResult Player_applyHit(PlayerHitState state)
 {
     PlayerHitResult result;

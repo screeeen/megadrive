@@ -9,6 +9,29 @@
 // so its bundled stdint.h #include_next's a target libc one that doesn't
 // exist. Plain `unsigned char` is 8-bit and include-free on both sides.)
 
+// SPEC.md §7 / TASKS.md NS-M04-001
+typedef enum
+{
+    WEAPON_VULCAN,
+    WEAPON_LASER,
+    WEAPON_WIDE,
+    WEAPON_HOMING,
+    WEAPON_FLAME,
+    WEAPON_COUNT
+} WeaponType;
+
+typedef struct
+{
+    WeaponType weapon;
+    unsigned char weaponLevel; // 1..3
+} WeaponState;
+
+// B button (SPEC.md §5/§8): switching always resets to level 1.
+WeaponState Weapon_switchNext(WeaponState state);
+
+// Same-weapon pickup (SPEC.md §8): raises level by one, capped at 3.
+WeaponState Weapon_levelUp(WeaponState state);
+
 typedef struct
 {
     unsigned char weaponLevel; // 1..3

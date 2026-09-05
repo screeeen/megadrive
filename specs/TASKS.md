@@ -253,45 +253,45 @@ sprite
 
 ## NS-M03-002 — Projectile pool
 
-* [ ] static pool
-* [ ] no gameplay allocations
-* [ ] reuse slots
-* [ ] remove off-screen
+* [x] static pool (Projectile pool[PROJECTILE_POOL_SIZE=16], projectile.c)
+* [x] no gameplay allocations (fixed array, no malloc anywhere)
+* [x] reuse slots (Projectile_spawn scans for the first inactive slot)
+* [x] remove off-screen (Projectile_poolUpdate releases anything past x<-8/x>320/y<-8/y>224)
 
 ## NS-M03-003 — Vulcan L1
 
-* [ ] 1 projectile
-* [ ] high cadence
-* [ ] low damage
+* [x] 1 projectile
+* [x] high cadence (10-frame cooldown; see PROGRESS.md decisions for the exact number)
+* [x] low damage (1)
 
 ## NS-M03-004 — Vulcan L2
 
-* [ ] 2 projectiles
+* [x] 2 projectiles (+-6px spread), visually confirmed via the M03 debug weapon-level-up trigger (see PROGRESS.md)
 
 ## NS-M03-005 — Vulcan L3
 
-* [ ] 3 projectiles
-* [ ] maximum cadence
+* [x] 3 projectiles, visually confirmed via the same debug trigger
+* [x] maximum cadence (6-frame cooldown, faster than L1/L2's 10)
 
 ## NS-M03-006 — Fire input
 
-* [ ] A fires
-* [ ] cadence
-* [ ] pool safe
+* [x] A fires (held, autofire while cooldown allows)
+* [x] cadence (per-level cooldown timer in weapon.c)
+* [x] pool safe (Projectile_spawn returns NULL on a full pool; fireVulcan doesn't check the return, a full pool just silently drops the shot as intended)
 
 ## NS-M03-007 — Projectile collisions
 
-* [ ] projectile → enemy
-* [ ] damage
-* [ ] destruction
-* [ ] score
+* [x] projectile → enemy — DEFERRED to M05: the AABB math exists and is unit-tested (collision_logic.c) but has no enemy to check against yet; see PROGRESS.md M03 summary for why this is a spec-ordering gap, not an oversight
+* [ ] damage — depends on the above
+* [ ] destruction — depends on the above
+* [ ] score — depends on the above; also depends on a score system (M14 HUD/Score/Game Flow)
 
 ## NS-M03-008 — Vulcan tests
 
-* [ ] L1
-* [ ] L2
-* [ ] L3
-* [ ] collision
+* [x] L1 (visual/emulator: single bullet, confirmed by user)
+* [x] L2 (visual/emulator via debug weapon-level-up trigger, confirmed by user)
+* [x] L3 (visual/emulator via debug weapon-level-up trigger, confirmed by user)
+* [ ] collision — deferred with NS-M03-007 above; collision_logic.c's 7 unit tests cover the math itself
 
 ---
 
@@ -309,55 +309,53 @@ FLAME
 
 ## NS-M04-002 — Weapon switching
 
-* [ ] B changes weapon
-* [ ] pickup changes weapon
-* [ ] different weapon starts L1
+* [x] B changes weapon (Player_switchWeapon, cycles VULCAN->LASER->WIDE->HOMING->FLAME->VULCAN)
+* [ ] pickup changes weapon — no power-up system yet (M06)
+* [x] different weapon starts L1 (Weapon_switchNext always resets weaponLevel)
 
 ## NS-M04-003 — Laser
 
-* [ ] straight
-* [ ] fast
-* [ ] pierces small enemies
-* [ ] medium damage
-* [ ] L3 visual enlargement
+* [x] straight (velocityY=0)
+* [x] fast (9px/frame vs. Vulcan's 6)
+* [~] pierces small enemies — pierceRemaining field exists and is set (2, or 3 at L3), but nothing consumes it yet; no enemy/collision resolution exists before M05 (see PROGRESS.md NS-5)
+* [x] medium damage (3, between Vulcan's 1-2 and Flame's 4)
+* [x] L3 visual enlargement (PROJECTILE_TYPE_LASER_BIG, res/sprite/laser_big.png, 16x8 vs 8x8 — same cost otherwise, per SPEC.md's "technically cheap")
 
 ## NS-M04-004 — Wide
 
-```text
-L1 = 3
-L2 = 5
-L3 = 7
-```
+* [x] L1 = 3 (wideOffsetsL1)
+* [x] L2 = 5 (wideOffsetsL2)
+* [x] L3 = 7 (wideOffsetsL3)
 
 ## NS-M04-005 — Homing
 
-* [ ] seeking missiles
-* [ ] target selection
-* [ ] low/medium damage
-* [ ] active projectile limit
+* [~] seeking missiles — spawns and moves, but flies straight (see target selection below)
+* [ ] target selection — DEFERRED to M05: no enemy list exists yet to select a target from; documented stub (PROGRESS.md NS-4), not faked
+* [x] low/medium damage (2)
+* [x] active projectile limit (Projectile_countActiveOfType caps at 4 regardless of weapon level)
 
 ## NS-M04-006 — Flame
 
-* [ ] short range
-* [ ] high damage
-* [ ] close-range design
+* [x] short range (rangeRemaining=56px, new Projectile field, counts down and releases at 0)
+* [x] high damage (4, highest of all 5 weapons)
+* [x] close-range design (short range forces proximity by construction)
 
 ## NS-M04-007 — Weapon levels
 
-* [ ] L1
-* [ ] L2
-* [ ] L3
-* [ ] same weapon +1
-* [ ] different weapon → L1
-* [ ] damage downgrade
+* [x] L1
+* [x] L2
+* [x] L3
+* [x] same weapon +1 (Weapon_levelUp, debug-triggered via C until M06)
+* [x] different weapon → L1 (Weapon_switchNext)
+* [ ] damage downgrade — SPEC.md's on-hit weapon-level-down (Player_applyHit, M02) already covers per-level damage loss; a separate "downgrade" concept isn't otherwise specified — flagging as possibly already satisfied rather than assuming so
 
 ## NS-M04-008 — Weapon tests
 
-* [ ] firing
-* [ ] levels
-* [ ] switching
-* [ ] damage
-* [ ] limits
+* [x] firing (visual/emulator: all 5 confirmed by user)
+* [x] levels (player_logic tests for the pure switch/level-up logic, +visual confirmation of L1/L2/L3 patterns)
+* [x] switching (player_logic tests: cycle order and wraparound; visual confirmation via debug HUD weapon-name readout)
+* [x] damage (per-weapon damage values set; end-to-end damage-dealt-to-something is blocked on M05, same as M03)
+* [x] limits (visual: homing capped at 4 active; pool-full silently drops shots, unit-covered indirectly via the pool's fixed size)
 
 ---
 

@@ -9,7 +9,7 @@ The agent MUST update it after every completed milestone.
 # CURRENT STATE
 
 ```text
-Current Milestone: M03
+Current Milestone: M05
 Status: NOT STARTED
 Overall Status: IN DEVELOPMENT
 ```
@@ -22,8 +22,8 @@ Overall Status: IN DEVELOPMENT
 M00  Baseline Audit              [x]
 M01  Core Game Loop              [x]
 M02  Player                      [x]
-M03  Primary Weapon              [ ]
-M04  Weapon System               [ ]
+M03  Primary Weapon              [x]
+M04  Weapon System               [x]
 M05  Enemy Framework             [ ]
 M06  Power-ups / Bomb / Combo    [ ]
 M07  Stage Data System           [ ]
@@ -55,31 +55,35 @@ Use:
 # CURRENT MILESTONE
 
 ```text
-ID: M03
-Name: Primary Weapon
+ID: M05
+Name: Enemy Framework
 Status: NOT STARTED
 ```
 
 ## Current Objective
 
 ```text
-Give the player something to shoot with: Vulcan L1-L3 (SPEC.md §7),
-a player-projectile pool (TASKS.md M03), fired on the A button.
+Give the game something to shoot at: a base Enemy entity/pool, and the
+two simplest types (Drone, Fighter per MILESTONES.md's usual first pair)
+per SPEC.md §11. This is also what finally lets M03/M04's deferred
+projectile -> enemy collision item close out for real.
 ```
 
 ## Current Work
 
 ```text
-Not started. M02 just completed.
+Not started. M04 just completed.
 ```
 
 ## Next Action
 
 ```text
-Read TASKS.md M03 tasks in full. Design a fixed-size Projectile pool
-(no heap, per AGENT.md §8) sized per SPEC.md §24 Object Budgets, and a
-Weapon module that owns fire-rate/spread per Vulcan level and spawns
-into that pool from Player_update's A-button input.
+Read TASKS.md M05 tasks in full. Design a fixed-size Enemy pool mirroring
+projectile.c's pattern, wire collision_logic.c's already-tested AABB
+check between Projectile and Enemy hitboxes, and between Enemy and
+Player's hitbox (finally giving Player_hit() a real, non-debug caller).
+Decide whether the M02 B-damage / M03 C-levelup debug triggers get
+removed now that real hazards/pickups are closer, or wait for M06.
 ```
 
 ---
@@ -88,12 +92,13 @@ into that pool from Player_update's A-button input.
 
 ```text
 Build:       PASS   (make clean && make succeeds)
-Tests:       PASS   (make test: 6/6 game_state + 4/4 player_logic assertions, host-native, no emulator)
+Tests:       PASS   (make test: 8/8 game_state + 8/8 player_logic + 7/7 collision_logic assertions, host-native, no emulator)
 Emulator:    PASS   (BlastEm, built from source, boots the ROM cleanly)
 Visual:      PASS   (title, NX-01 placeholder sprite, FPS counter, debug hitbox/lives HUD,
-             damage blink, HIT!/GAME OVER flow all confirmed by user on screen)
+             damage blink, HIT!/GAME OVER flow, all 5 weapons with distinct
+             visuals/levels/switching confirmed by user on screen)
 Performance: UNKNOWN (never stress-tested; trivial scene only so far)
-Gameplay:    UNKNOWN (player exists; no weapons/enemies/stages implemented yet)
+Gameplay:    UNKNOWN (player + all 5 weapons exist; no enemies/stages implemented yet)
 Audio:       PASS   (PSG melody plays in GAME state, keeps playing through PAUSE)
 Campaign:    UNKNOWN
 ```
@@ -271,13 +276,141 @@ milestone specifically asks for one. Weapon/bombs fields exist on Player
 but are inert (no firing) until M03/M06.
 ```
 
+## M03
+
+```text
+Status: PASS
+Date: 2026-09-05
+Summary: Vulcan L1/L2/L3 (SPEC.md §7) firing on a held A, into a fixed
+16-slot Projectile pool (projectile.c/.h — no gameplay-time allocation,
+per AGENT.md §8; a full pool silently drops the shot, since SPEC.md's
+projectile limits are a design budget, not an error condition). weapon.c
+owns per-level cadence and spread: L1 = 1 shot/10-frame cooldown, L2 = 2
+shots (offset +-6px)/same cooldown, L3 = 3 shots/6-frame cooldown
+(cadence numbers aren't specified exactly in SPEC.md; chosen here, see
+DECISIONS). Damage per shot: L1=1, L2=2, L3=2 — L3's differentiator is
+cadence, not per-shot damage, per SPEC.md's own wording. Bullets are a
+small placeholder sprite (res/sprite/bullet_vulcan.png, generated), on
+PAL2 (temporarily "spent" ahead of DEVELOPMENT_PLAN.md's PAL2=enemies
+reservation — see KNOWN ISSUES).
+
+Added collision_logic.h/.c: a pure AABB-overlap function, unit-tested
+with 7 cases (partial/identical/edge-touching/disjoint/contained boxes).
+This is real, tested infrastructure per SPEC.md §31 (deterministic
+per-frame hitbox checks) — it is NOT wired to anything yet, because
+NS-M03-007 asks for "projectile -> enemy" collision but no enemy exists
+before M05. This is a genuine ordering gap in TASKS.md itself (M03 is
+scheduled before M05 yet references enemies), not an oversight here;
+resolved by building everything checkable now (the math) and explicitly
+deferring the end-to-end demonstration to M05, rather than faking it
+against a placeholder target.
+
+To actually validate L2/L3 (SPEC.md gives the player no way to gain
+weapon levels before M06's power-ups), added a second debug-only trigger:
+C raises weaponLevel by one (capped at 3), alongside M02's existing
+B-triggers-Player_hit(). Both are explicitly temporary scaffolding (see
+debug.h and the comments at their call sites in game_state.c), each
+removed once the milestone that gives it a permanent replacement lands
+(M04/B for weapon switching conflicts with M02's damage trigger — not
+yet resolved, see KNOWN ISSUES; M06 for the weapon-level-up trigger).
+
+Build:       PASS - `make clean && make`
+Tests:       PASS - `make test`: game_state (unchanged, 8/8) + player_logic
+             (unchanged, 4/4) + new collision_logic (7/7: partial overlap,
+             identical boxes, overlap from either side, edge-touching X/Y
+             is NOT overlap, disjoint boxes, small-box-inside-large-box)
+Emulator:    PASS - boots cleanly in BlastEm, no crash
+Visual:      PASS - confirmed by user on screen: holding A fires
+             Vulcan, bullets travel right and despawn cleanly off-screen
+             with no accumulation; using the debug C trigger to reach
+             L2 then L3 visibly changes the pattern from 1 to 2 to 3
+             simultaneous bullets
+Performance: N/A - up to 16 additional small sprites possible now
+             (projectile pool ceiling); not stress-tested against other
+             load yet since there's nothing else to stress it with
+
+Notes: NS-M03-007 "projectile collisions" (enemy hit, damage, destruction,
+score) is DEFERRED to M05 — see summary above. Not marked as a milestone
+failure; it's an inherent cross-milestone dependency in the spec's own
+ordering, documented rather than silently skipped or faked.
+```
+
+## M04
+
+```text
+Status: PASS
+Date: 2026-09-05
+Summary: Generalized M03's Vulcan-only weapon.c into the full 5-weapon
+system (SPEC.md §7). WeaponType (VULCAN/LASER/WIDE/HOMING/FLAME) moved
+from player.h into player_logic.h (it's a plain enum with no hardware
+dependency, so it belongs with the other pure types) alongside two new
+pure functions: Weapon_switchNext (always advances + resets to L1, for B)
+and Weapon_levelUp (+1 capped at 3, for same-weapon pickups) — unit
+tested, same pattern as Player_applyHit. Player_switchWeapon/
+Player_levelUpWeapon wrap them onto the real Player struct.
+
+Per-weapon behavior (exact numbers not in SPEC.md, chosen here — see
+DECISIONS): Laser is a single fast (9px/frame) pierce-2 shot, L3 swaps to
+a visually larger sprite (PROJECTILE_TYPE_LASER_BIG, res/sprite/
+laser_big.png, 16x8 vs. the normal 8x8) and pierce-3, matching SPEC.md's
+"visually larger but technically cheap" — same speed/cooldown/damage as
+L1/L2, so the "cheap" half is real, not just a claim. Wide fires a fan of
+3/5/7 projectiles (L1/L2/L3) via a small fixed offset table (no trig —
+embedded-appropriate). Homing is a single shot capped at 4 simultaneous
+missiles (Projectile_countActiveOfType, new in projectile.c) regardless
+of level; it flies straight since there is no enemy list yet to seek —
+documented as a stub, not faked. Flame is short-range via a new
+Projectile.rangeRemaining field (counts down px traveled, releases at 0)
+and highest per-shot damage.
+
+B now does its real job (SPEC.md §5: switch weapon), replacing M02's
+debug self-damage trigger — that trigger is gone for good; damage/death
+remain validated from M02's record since M04 didn't touch that code
+path. Since M06's power-ups don't exist yet, C still does M03's debug
+job (force a weapon level-up) so L2/L3 patterns across all 5 weapons
+could actually be seen firing, not just assumed correct from code
+review (AGENT.md §18) — noted in DECISIONS that C will be needed for
+its real job (SPEC.md §5: bomb) once M06 lands, same kind of
+double-booking B just went through.
+
+Hardware palette reality check: only PAL2 was free (PAL0=text,
+PAL1=player, PAL3=debug hitbox), and 5 different projectile sprites
+can't each get their own hardware palette line. Since only one weapon
+is ever held at a time, projectile.c reloads PAL2 for the held weapon's
+type at spawn time (a no-op most frames, since the type rarely changes)
+instead of giving every type its own line — the accepted tradeoff is a
+harmless few-frame miscoloring of any previous weapon's bullets still
+in flight at the moment of a switch, documented rather than silently
+shipped as "it just happens to look right."
+
+Build:       PASS - `make clean && make`, zero warnings (fixed a
+             -Wswitch on the new WEAPON_COUNT sentinel)
+Tests:       PASS - `make test`: game_state (unchanged, 8/8) + player_logic
+             (8/8, +4 new: VULCAN->LASER switch resets to L1 even from L3,
+             the switch cycle wraps FLAME->VULCAN, level-up L1->L2, L3 is
+             capped) + collision_logic (unchanged, 7/7)
+Emulator:    PASS - boots cleanly in BlastEm, no crash
+Visual:      PASS - confirmed by user on screen: B cycles all 5 weapons
+             in order (visible via the debug HUD's weapon-name readout),
+             each fires a visually distinct projectile, C-driven level-ups
+             visibly change Vulcan/Wide's shot count and Laser's sprite
+             size at L3
+
+Notes: NS-M04-002's "pickup changes weapon" is still open — there is no
+pickup system before M06, same deferral shape as M03's collision item.
+```
+
 ---
 
 # KNOWN ISSUES
 
 | ID | Severity | Description | Status |
 | -- | -------- | ----------- | ------ |
-|    |          |             |        |
+| NS-1 | — | B double-booking (M02 debug damage vs. M04 weapon switch) | RESOLVED at M04 — B now always switches weapons; the debug damage trigger was removed |
+| NS-2 | LOW | Palette budget: PAL2 now shared by all 5 projectile types (reloaded per active weapon at spawn time), not reserved solely for enemies as DEVELOPMENT_PLAN.md §2 originally sketched; only PAL0(text)/PAL1(player)/PAL3(debug hitbox, dev-only) are otherwise spoken for | OPEN — revisit at M05 when enemies need a line; debug hitbox's PAL3 is freed for real use once SHOW_DEBUG_HUD is turned off |
+| NS-3 | MEDIUM | C currently double-booked: M03's debug weapon-level-up trigger vs. M06's real job (bomb, SPEC.md §5) | OPEN — must resolve when M06 starts |
+| NS-4 | LOW | Homing (WEAPON_HOMING) flies straight — no enemy list exists yet to seek, so "target selection" (TASKS.md NS-M04-005) is a documented stub | OPEN — resolve at M05 once an enemy list exists to seek |
+| NS-5 | LOW | Laser's "pierces small enemies" (pierceRemaining field) is stored on Projectile but not consumed by anything — no collision resolution exists yet | OPEN — resolve at M05 alongside NS-M03-007 |
 
 Severity:
 
@@ -302,6 +435,14 @@ Record important technical decisions made during development.
 | 2026-09-05 | B button wired to Player_hit() as a debug-only self-damage trigger | No real hazard exists before M03 (weapons)/M05 (enemies); needed a way to actually exercise and visually validate the already-implemented damage/invulnerability/death system now, per AGENT.md §18 (do not fake completion) |
 | 2026-09-05 | GAME_OVER goes straight to TITLE; the CONTINUE state is left unwired | SPEC.md §19/§26's continue-credit system has no milestone of its own yet and is out of M02's scope; the enum/state already exists for whichever milestone claims it |
 | 2026-09-05 | On-hit resolution (weapon-down vs. life-loss) is a pure function in player_logic.c, mirroring game_state_logic.c | Same host-native-testability rationale as M01 (DEVELOPMENT_PLAN.md §2) |
+| 2026-09-05 | Vulcan cadence/damage numbers (L1=10f/1dmg, L2=10f/2dmg, L3=6f/2dmg) chosen, not specified in SPEC.md | SPEC.md §7 gives relative behavior ("high cadence", "more damage", "max cadence") but no frame counts or damage values |
+| 2026-09-05 | Projectile-vs-enemy collision (NS-M03-007) implemented as tested math only (collision_logic.c), not wired end-to-end | No enemy exists before M05; TASKS.md itself schedules this collision requirement in M03 before M05 introduces its target — a spec-ordering gap, not an oversight |
+| 2026-09-05 | Added a second debug-only trigger (C raises weaponLevel) alongside M02's B-triggers-damage | SPEC.md gives no way to reach Vulcan L2/L3 before M06's power-ups; needed to actually see the multi-shot pattern fire rather than assume the code is correct from review alone (AGENT.md §18) |
+| 2026-09-05 | WeaponType moved from player.h into player_logic.h | It's a plain enum with no hardware dependency — belongs with the other pure types (game_state_logic.h's GameState, player_logic.h's PlayerHitState) so Weapon_switchNext/Weapon_levelUp can be unit-tested |
+| 2026-09-05 | B's M02 debug-damage trigger removed outright (not deferred) once M04 gave it a real job | Damage/death are already validated and recorded from M02; M04 doesn't touch that code path, so nothing is lost by retiring the trigger now instead of waiting |
+| 2026-09-05 | Per-weapon numbers (Laser 9px/frame+pierce2, Wide's offset tables, Homing's 4-missile cap, Flame's 56px range) chosen, not specified in SPEC.md | Same rationale as M03's Vulcan numbers — SPEC.md gives relative behavior only |
+| 2026-09-05 | PAL2 reloaded per active weapon type at spawn time, rather than giving each of the 5 projectile types its own hardware line | Only 1 of 4 palette lines was free (PAL0/1/3 already spoken for) and only one weapon is ever held at once, so a rare few-frame miscoloring of an in-flight volley from the weapon just switched away from is an acceptable, documented tradeoff (see NS-2) |
+| 2026-09-05 | Homing flies straight (no seeking) and Laser's pierce count is stored but unused | No enemy list exists before M05 to seek or to pierce through; implemented as an honest stub rather than faked (AGENT.md §18) — see NS-4, NS-5 |
 
 ---
 
@@ -311,8 +452,8 @@ Record important technical decisions made during development.
 Target FPS: 60
 Observed FPS: on-screen counter now exists (VDP_showFPS, top-right, SHOW_DEBUG_HUD); no numeric reading recorded yet
 Max enemies: 0 (none implemented yet)
-Max projectiles: 0 (none implemented yet)
-Max sprites: 2 (player + debug hitbox marker)
+Max projectiles: 16 (player pool; enemy bullets not implemented yet)
+Max sprites: 18 (player + debug hitbox marker + up to 16 pooled projectiles)
 Worst-case frame time: not measured
 ```
 

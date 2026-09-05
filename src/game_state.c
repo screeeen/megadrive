@@ -63,10 +63,23 @@ static void GameOver_enter(void)
 }
 
 #if SHOW_DEBUG_HUD
+static const char* weaponName(WeaponType weapon)
+{
+    switch (weapon)
+    {
+        case WEAPON_VULCAN: return "VULCAN";
+        case WEAPON_LASER:  return "LASER";
+        case WEAPON_WIDE:   return "WIDE";
+        case WEAPON_HOMING: return "HOMING";
+        case WEAPON_FLAME:  return "FLAME";
+        default:            return "?";
+    }
+}
+
 static void drawDebugHud(void)
 {
-    char buf[20];
-    sprintf(buf, "LIVES:%d LV:%d", player.lives, player.weaponLevel);
+    char buf[24];
+    sprintf(buf, "LIVES:%d %s LV:%d", player.lives, weaponName(player.weapon), player.weaponLevel);
     VDP_drawText(buf, 1, 26);
 }
 #endif
@@ -108,12 +121,21 @@ void GameState_update(void)
         case STATE_GAME:
             Player_update(&player, input);
 
-            // Debug-only: no real hazard exists before M03 (weapons) / M05
-            // (enemies) can hurt the player, so B is wired to Player_hit()
-            // to exercise and visually validate damage/invulnerability/
-            // death right now. Remove once real collisions land.
+            // B (SPEC.md §5): real weapon switching, replacing M02's debug
+            // self-damage trigger now that B has a permanent job. Player
+            // death/invulnerability stay validated from M02's record; M04
+            // doesn't touch that code path.
             if (input->bPressed)
-                Player_hit(&player);
+                Player_switchWeapon(&player);
+
+            // Debug-only: no power-up system exists before M06, so there is
+            // no in-game way to reach weapon level 2/3 to verify Vulcan/
+            // Laser/Wide's per-level firing pattern. C raises weaponLevel
+            // directly so this can actually be seen instead of assumed from
+            // code review. Remove once M06 gives real weapon pickups (which
+            // will also want C for its real job: SPEC.md §5's bomb button).
+            if (input->cPressed)
+                Player_levelUpWeapon(&player);
 
             if (Player_isDead(&player))
             {

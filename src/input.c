@@ -22,6 +22,7 @@ void Input_update(void)
     state.a = (value & BUTTON_A) != 0;
     state.b = (value & BUTTON_B) != 0;
     state.bPressed = state.b && !(previousValue & BUTTON_B);
+    state.cPressed = (value & BUTTON_C) && !(previousValue & BUTTON_C);
 
     previousValue = value;
 }

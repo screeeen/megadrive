@@ -48,9 +48,35 @@ int main(void)
         CHECK(out.gameOver, "hit at 0 lives is still game over");
     }
 
+    // Weapon switching (B button): always advances and always resets to L1.
+    {
+        WeaponState in = { WEAPON_VULCAN, 3 };
+        WeaponState out = Weapon_switchNext(in);
+        CHECK(out.weapon == WEAPON_LASER, "VULCAN -> LASER");
+        CHECK(out.weaponLevel == 1, "switching resets to L1 even from L3");
+    }
+    {
+        WeaponState in = { WEAPON_FLAME, 2 };
+        WeaponState out = Weapon_switchNext(in);
+        CHECK(out.weapon == WEAPON_VULCAN, "the cycle wraps: FLAME -> VULCAN");
+    }
+
+    // Weapon level-up (same-weapon pickup): +1, capped at 3.
+    {
+        WeaponState in = { WEAPON_WIDE, 1 };
+        WeaponState out = Weapon_levelUp(in);
+        CHECK(out.weaponLevel == 2, "L1 -> L2");
+        CHECK(out.weapon == WEAPON_WIDE, "level-up does not change weapon type");
+    }
+    {
+        WeaponState in = { WEAPON_WIDE, 3 };
+        WeaponState out = Weapon_levelUp(in);
+        CHECK(out.weaponLevel == 3, "L3 is capped, does not overflow");
+    }
+
     if (failures == 0)
     {
-        printf("PASS: all player_logic hit-resolution tests passed\n");
+        printf("PASS: all player_logic hit-resolution/weapon tests passed\n");
         return 0;
     }
 

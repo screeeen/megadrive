@@ -96,6 +96,23 @@ bool Player_isDead(const Player* player)
     return player->state == PLAYER_STATE_DEAD;
 }
 
+void Player_switchWeapon(Player* player)
+{
+    WeaponState in = { player->weapon, player->weaponLevel };
+    WeaponState out = Weapon_switchNext(in);
+
+    player->weapon = out.weapon;
+    player->weaponLevel = out.weaponLevel;
+}
+
+void Player_levelUpWeapon(Player* player)
+{
+    WeaponState in = { player->weapon, player->weaponLevel };
+    WeaponState out = Weapon_levelUp(in);
+
+    player->weaponLevel = out.weaponLevel;
+}
+
 void Player_update(Player* player, const InputState* input)
 {
     if (player->state == PLAYER_STATE_DEAD)
