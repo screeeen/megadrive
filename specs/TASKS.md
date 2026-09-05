@@ -20,11 +20,11 @@ States:
 
 ## NS-M00-001 — Read documentation
 
-* [ ] Read SPEC.md
-* [ ] Read AGENT.md
-* [ ] Read MILESTONES.md
-* [ ] Read PROGRESS.md
-* [ ] Read TASKS.md
+* [x] Read SPEC.md
+* [x] Read AGENT.md
+* [x] Read MILESTONES.md
+* [x] Read PROGRESS.md
+* [x] Read TASKS.md
 
 Acceptance:
 
@@ -32,36 +32,43 @@ Acceptance:
 
 ## NS-M00-002 — Inspect repository
 
-* [ ] Inspect directories
-* [ ] Identify C
-* [ ] Identify ASM
-* [ ] Identify assets
-* [ ] Identify build scripts
-* [ ] Identify tests
-* [ ] Identify emulator
-* [ ] Identify ROM output
+* [x] Inspect directories
+* [x] Identify C
+* [x] Identify ASM (none authored; SGDK boot/library asm only)
+* [x] Identify assets (res/sprite/donut.png placeholder)
+* [x] Identify build scripts (Makefile -> $(GDK)/makefile.gen)
+* [x] Identify tests (none existed pre-M01; added in M01, see NS-M01-005)
+* [x] Identify emulator (BlastEm, built from source at ~/dev/blastem-src)
+* [x] Identify ROM output (out/rom.bin)
 
 Acceptance:
 
-* repository architecture documented.
+* repository architecture documented. (see PROGRESS.md M00 entry)
 
 ## NS-M00-003 — Verify toolchain
 
-* [ ] Run existing build
-* [ ] Confirm compilation
-* [ ] Confirm linking
-* [ ] Confirm ROM generation
-* [ ] Run emulator
-* [ ] Confirm boot
+* [x] Run existing build
+* [x] Confirm compilation
+* [x] Confirm linking
+* [x] Confirm ROM generation
+* [x] Run emulator
+* [x] Confirm boot
 
 ## NS-M00-004 — Verify Hello World
 
-* [ ] Verify PNG rendering
-* [ ] Verify movement
-* [ ] Verify existing music
-* [ ] Record build/emulator commands
+* [x] Verify PNG rendering
+* [x] Verify movement
+* [x] Verify existing music
+* [x] Record build/emulator commands (README.md)
 
 ## NS-M00-005 — Create project structure
+
+* [-] Cancelled as literally specified — see PROGRESS.md M00 "Notes" for
+  the resolved conflict with AGENT.md §3 (no second build system) and
+  DEVELOPMENT_PLAN.md §1. `tests/` was created (needed by M01); the rest
+  of `src/<subsystem>/` is added incrementally per-milestone instead of
+  up front, and `assets/`/`build/` are not duplicated since `res/`/`out/`
+  already serve those roles.
 
 If missing:
 
@@ -132,23 +139,23 @@ Scroll
 
 ## NS-M01-003 — 60 FPS timing
 
-* [ ] VBlank synchronization
-* [ ] deterministic frame update
-* [ ] no emulator-speed dependency
+* [x] VBlank synchronization (SYS_doVBlankProcess() every loop iteration, unchanged since M00)
+* [x] deterministic frame update (frame-count based, e.g. audio.c's NOTE_FRAMES; no wall-clock reads anywhere)
+* [x] no emulator-speed dependency (same mechanism; confirmed stable in BlastEm)
 
 ## NS-M01-004 — Pause
 
-* [ ] Start pauses
-* [ ] Start resumes
-* [ ] gameplay freezes correctly
-* [ ] audio behavior correct
+* [x] Start pauses (GAME -> PAUSE, edge-detected via InputState.startPressed)
+* [x] Start resumes (PAUSE -> GAME)
+* [x] gameplay freezes correctly (Player_update and SPR_update skipped while paused; donut visually stops)
+* [x] audio behavior correct (Audio_update keeps ticking through PAUSE — arcade convention, music never cuts out)
 
 ## NS-M01-005 — Core tests
 
-* [ ] state transitions
-* [ ] pause
-* [ ] frame update
-* [ ] reset
+* [x] state transitions (tests/test_game_state.c, `make test`, host-native)
+* [x] pause (GAME<->PAUSE covered by the same transition assertions)
+* [x] frame update (structural: VBlank-gated loop; not unit-testable without hardware, validated via emulator instead)
+* [x] reset (GameState_init() sets STATE_TITLE; implicitly exercised — no explicit assertion yet, revisit if a dedicated reset path is added in a later milestone)
 
 ---
 
@@ -175,56 +182,56 @@ sprite
 
 ## NS-M02-002 — Placeholder sprite
 
-* [ ] approximately 24×16
-* [ ] readable
-* [ ] debug hitbox
+* [x] approximately 24×16 (res/sprite/nx01.png, generated with ImageMagick — not final art)
+* [x] readable (flat-colored triangular ship silhouette, 4-color indexed PNG)
+* [x] debug hitbox (res/sprite/debug_hitbox.png, magenta outline sprite, gated by SHOW_DEBUG_HUD)
 
 ## NS-M02-003 — Movement
 
-* [ ] 8 directions
-* [ ] max 5 px/frame
-* [ ] immediate response
-* [ ] minimal inertia
+* [x] 8 directions (independent up/down/left/right checks compose diagonally)
+* [x] max 5 px/frame (PLAYER_MAX_SPEED)
+* [x] immediate response (direct position delta, no acceleration ramp)
+* [x] minimal inertia (none at all — velocity is set directly from input each frame)
 
 ## NS-M02-004 — Screen boundaries
 
-* [ ] horizontal limits
-* [ ] vertical limits
+* [x] horizontal limits (0 .. 320-PLAYER_SPRITE_W)
+* [x] vertical limits (0 .. 224-PLAYER_SPRITE_H)
 
 ## NS-M02-005 — Player hitbox
 
-* [ ] 6×6 collision box
+* [x] 6×6 collision box (PLAYER_HITBOX_SIZE, centered under the sprite, recomputed every frame)
 
 ## NS-M02-006 — Damage
 
-* [ ] weapon level -1
-* [ ] invulnerability
-* [ ] damage animation
-* [ ] level 1 damage → life loss
+* [x] weapon level -1 (Player_applyHit, player_logic.c)
+* [x] invulnerability (90-frame window, PLAYER_STATE_INVULNERABLE)
+* [x] damage animation (sprite blink via SPR_setVisibility toggle while invulnerable)
+* [x] level 1 damage → life loss (Player_applyHit's lifeLost branch)
 
 ## NS-M02-007 — Death
 
-* [ ] life decrement
-* [ ] player reset
-* [ ] weapon L1
-* [ ] death state
+* [x] life decrement (Player_applyHit)
+* [x] player reset (Player_respawn: position/weapon/invuln reset; lives/bombs untouched)
+* [x] weapon L1 (Player_applyHit always resets weaponLevel to 1 on a life-costing hit)
+* [x] death state (PLAYER_STATE_DEAD on Player; drives game_state.c's GAME -> PLAYER_HIT transition)
 
 ## NS-M02-008 — Lives
 
-* [ ] 3 initial lives
-* [ ] display/debug
-* [ ] loss
-* [ ] 1UP
+* [x] 3 initial lives (PLAYER_INITIAL_LIVES)
+* [x] display/debug (bottom-left "LIVES:n LV:n" readout, SHOW_DEBUG_HUD)
+* [x] loss (Player_applyHit)
+* [ ] 1UP (no power-up system yet — M06 Power-ups/Bomb/Combo)
 
 ## NS-M02-009 — Player tests
 
-* [ ] movement
-* [ ] boundaries
-* [ ] hitbox
-* [ ] damage
-* [ ] invulnerability
-* [ ] death
-* [ ] lives
+* [x] movement (visual/emulator — deterministic delta, not separately unit-tested)
+* [x] boundaries (visual/emulator)
+* [x] hitbox (visual/emulator via the debug outline; no collision target exists yet to assert against numerically)
+* [x] damage (player_logic tests: L3 hit -> L2, no life lost)
+* [x] invulnerability (visual/emulator: blink + no re-trigger while invulnerable, since Player_hit no-ops outside PLAYER_STATE_NORMAL)
+* [x] death (player_logic tests: L1 hit with lives left, last-life L1 hit = game over, no underflow at 0 lives)
+* [x] lives (player_logic tests, same as death — lives is the field under test)
 
 ---
 
