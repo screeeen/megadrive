@@ -6,6 +6,8 @@
 
 #define TILE_STAR    TILE_USER_INDEX
 #define TILE_BUILDING (TILE_USER_INDEX + 1)
+#define TILE_DUNE     (TILE_USER_INDEX + 2)
+#define TILE_PIPE     (TILE_USER_INDEX + 3)
 
 static s16 scrollX;
 
@@ -31,6 +33,32 @@ void Scroll_init(u8 backgroundId)
 
         for (u16 x = 0; x < PLANE_WIDTH_TILES; x += 4)
             VDP_fillTileMapRect(BG_B, buildingAttr, x, 20, 1, PLANE_HEIGHT_TILES - 20);
+    }
+    else if (backgroundId == 2)
+    {
+        // Stage 2 (Red Desert): starfield swapped for a dune silhouette
+        // strip along the bottom of the plane. Sandstorms/reduced
+        // visibility (SPEC.md §17) are NOT implemented — no visibility/fog
+        // mechanic exists in the engine yet, see PROGRESS.md.
+        VDP_loadTileSet(&bgDune, TILE_DUNE, DMA);
+
+        u16 duneAttr = TILE_ATTR_FULL(PAL3, FALSE, FALSE, FALSE, TILE_DUNE);
+        VDP_fillTileMapRect(BG_B, duneAttr, 0, 24, PLANE_WIDTH_TILES, PLANE_HEIGHT_TILES - 24);
+    }
+    else if (backgroundId == 3)
+    {
+        // Stage 3 (Space Colony): starfield swapped for vertical pipe
+        // columns every few tiles, spanning the full plane height (SPEC.md
+        // §18's corridors/pipes/machinery). Doors/moving walls/presses
+        // (§40.4's obstacle list) are NOT implemented — no scenery-
+        // obstacle/hazard concept exists in the engine yet, see PROGRESS.md
+        // NS-9.
+        VDP_loadTileSet(&bgPipe, TILE_PIPE, DMA);
+
+        u16 pipeAttr = TILE_ATTR_FULL(PAL3, FALSE, FALSE, FALSE, TILE_PIPE);
+
+        for (u16 x = 0; x < PLANE_WIDTH_TILES; x += 5)
+            VDP_fillTileMapRect(BG_B, pipeAttr, x, 0, 1, PLANE_HEIGHT_TILES);
     }
 
     VDP_setHorizontalScroll(BG_B, 0);

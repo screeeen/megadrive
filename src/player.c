@@ -1,5 +1,6 @@
 #include "player.h"
 #include "resources.h"
+#include "audio.h"
 
 #define PLAYER_MIN_X 0
 #define PLAYER_MAX_X (320 - PLAYER_SPRITE_W)
@@ -62,6 +63,8 @@ void Player_hit(Player* player)
 {
     if (player->state != PLAYER_STATE_NORMAL)
         return;
+
+    Audio_playSfx(SFX_HIT);
 
     PlayerHitState in;
     in.weaponLevel = player->weaponLevel;

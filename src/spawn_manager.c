@@ -1,6 +1,7 @@
 #include "spawn_manager.h"
 #include "enemy.h"
 #include "powerup.h"
+#include "asteroid.h"
 
 static const StageDef* currentStage;
 static u32 currentFrame;
@@ -54,6 +55,8 @@ void SpawnManager_update(void)
 
         if (e->type == SPAWN_TYPE_ENEMY)
             Enemy_spawn((EnemyType) e->variant, e->x, e->y);
+        else if (e->type == SPAWN_TYPE_ASTEROID)
+            Asteroid_spawn((AsteroidSize) e->variant, e->x, e->y);
         else
             Powerup_spawn((PowerupType) e->variant, e->x, e->y);
 
@@ -75,4 +78,9 @@ bool SpawnManager_isComplete(void)
 u8 SpawnManager_getCheckpointsPassed(void)
 {
     return checkpointsPassed;
+}
+
+u32 SpawnManager_getCurrentFrame(void)
+{
+    return currentFrame;
 }

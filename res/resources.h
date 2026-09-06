@@ -19,6 +19,11 @@ extern const SpriteDefinition enemyCharger;
 extern const SpriteDefinition enemyShield;
 extern const SpriteDefinition enemyMiniboss;
 extern const SpriteDefinition bossGuardian;
+extern const SpriteDefinition bossSandworm;
+extern const SpriteDefinition bossIndustrialcore;
+extern const SpriteDefinition bossMiningfortress;
+extern const SpriteDefinition bossAdmiralx;
+extern const SpriteDefinition bossHelios;
 extern const SpriteDefinition enemyBullet;
 extern const SpriteDefinition powerupLaser;
 extern const SpriteDefinition powerupWide;
@@ -28,7 +33,13 @@ extern const SpriteDefinition powerupP;
 extern const SpriteDefinition powerupBomb;
 extern const SpriteDefinition powerupSpeed;
 extern const SpriteDefinition powerup1up;
+extern const SpriteDefinition asteroidSmall;
+extern const SpriteDefinition asteroidMedium;
+extern const SpriteDefinition asteroidLarge;
+extern const SpriteDefinition explosion;
 extern const TileSet bgStar;
 extern const TileSet bgBuilding;
+extern const TileSet bgDune;
+extern const TileSet bgPipe;
 
 #endif // _RES_RESOURCES_H_

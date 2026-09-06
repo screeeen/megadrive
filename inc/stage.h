@@ -3,8 +3,9 @@
 
 #include <genesis.h>
 
-#define SPAWN_TYPE_ENEMY   0
-#define SPAWN_TYPE_POWERUP 1
+#define SPAWN_TYPE_ENEMY    0
+#define SPAWN_TYPE_POWERUP  1
+#define SPAWN_TYPE_ASTEROID 2 // M11: variant holds an AsteroidSize value
 
 // TASKS.md NS-M07-001. `variant` holds an EnemyType or PowerupType value,
 // depending on `type` — a single byte can't hold both enums directly since
@@ -42,5 +43,20 @@ extern const StageDef testStage;
 // see stage1_data.c and PROGRESS.md for exactly which numeric targets a
 // hand-authored placeholder table does and doesn't hit.
 extern const StageDef stage1;
+
+// SPEC.md §17 Red Desert, M10. See stage2_data.c and PROGRESS.md.
+extern const StageDef stage2;
+
+// SPEC.md §18 Space Colony, M10. See stage3_data.c and PROGRESS.md.
+extern const StageDef stage3;
+
+// SPEC.md §19 Asteroid Belt, M11. See stage4_data.c and PROGRESS.md.
+extern const StageDef stage4;
+
+// SPEC.md §20 Helios Fleet, M11. See stage5_data.c and PROGRESS.md.
+extern const StageDef stage5;
+
+// SPEC.md §21 Helios Core, M12. See stage6_data.c and PROGRESS.md.
+extern const StageDef stage6;
 
 #endif // _STAGE_H_

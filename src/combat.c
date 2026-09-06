@@ -3,8 +3,11 @@
 #include "projectile.h"
 #include "enemy.h"
 #include "powerup.h"
+#include "asteroid.h"
 #include "score.h"
 #include "combo.h"
+#include "audio.h"
+#include "explosion.h"
 
 // Not specified in SPEC.md how often enemies drop power-ups — chosen here
 // (see PROGRESS.md): every 3rd kill, cycling through all 8 types so each
@@ -36,6 +39,12 @@ static AABB powerupBox(const Powerup* p)
     return box;
 }
 
+static AABB asteroidBox(const Asteroid* a)
+{
+    AABB box = { a->x, a->y, a->spriteW, a->spriteH };
+    return box;
+}
+
 static AABB playerBox(const Player* player)
 {
     AABB box = { player->hitboxX, player->hitboxY, PLAYER_HITBOX_SIZE, PLAYER_HITBOX_SIZE };
@@ -50,7 +59,7 @@ static AABB bossBox(const Boss* boss)
 
 static AABB bossVulnerablePointBox(const Boss* boss, u8 index)
 {
-    const VulnerablePoint* vp = &boss->vulnerablePoints[index];
+    const VulnerablePoint* vp = &boss->def->vulnerablePoints[index];
     AABB box = { (s16) (boss->x + vp->offsetX), (s16) (boss->y + vp->offsetY), vp->w, vp->h };
     return box;
 }
@@ -59,6 +68,8 @@ static void onEnemyKilled(u16 scoreGained, s16 x, s16 y)
 {
     Score_add((u16) (scoreGained * Combo_getMultiplier()));
     Combo_onKill();
+    Audio_playSfx(SFX_EXPLOSION);
+    Explosion_spawn(x, y);
 
     if (++killCount >= POWERUP_DROP_INTERVAL)
     {
@@ -107,6 +118,65 @@ static void resolvePlayerBulletsVsEnemies(void)
     }
 }
 
+static void resolvePlayerBulletsVsAsteroids(void)
+{
+    Projectile* projectiles = Projectile_getPool();
+    Asteroid* asteroids = Asteroid_getPool();
+
+    for (u16 i = 0; i < PROJECTILE_POOL_SIZE; i++)
+    {
+        Projectile* p = &projectiles[i];
+
+        if (!p->active || p->owner != PROJECTILE_OWNER_PLAYER)
+            continue;
+
+        for (u16 j = 0; j < ASTEROID_POOL_SIZE; j++)
+        {
+            Asteroid* a = &asteroids[j];
+
+            if (!a->active)
+                continue;
+
+            if (!Collision_overlaps(projectileBox(p), asteroidBox(a)))
+                continue;
+
+            // Large asteroids are indestructible (Asteroid_hit is a no-op
+            // for them) — the shot still gets spent/pierced against it,
+            // same as bumping into any other solid obstacle.
+            s16 deathX = a->x;
+            s16 deathY = a->y;
+            u16 scoreGained = Asteroid_hit(a, p->damage);
+
+            if (scoreGained > 0)
+                onEnemyKilled(scoreGained, deathX, deathY);
+
+            if (p->pierceRemaining > 0)
+                p->pierceRemaining--;
+            else
+                Projectile_release(p);
+
+            break;
+        }
+    }
+}
+
+static void resolveAsteroidContactVsPlayer(Player* player)
+{
+    Asteroid* asteroids = Asteroid_getPool();
+    AABB pBox = playerBox(player);
+
+    for (u16 i = 0; i < ASTEROID_POOL_SIZE; i++)
+    {
+        Asteroid* a = &asteroids[i];
+
+        if (!a->active)
+            continue;
+
+        if (Collision_overlaps(asteroidBox(a), pBox))
+            Player_hit(player); // no-op while already invulnerable/dead
+    }
+}
+
 static void resolveEnemyBulletsVsPlayer(Player* player)
 {
     Projectile* projectiles = Projectile_getPool();
@@ -146,6 +216,10 @@ static void resolveEnemyContactVsPlayer(Player* player)
 
 static void applyPowerup(Player* player, PowerupType type)
 {
+    // 1UP gets its own distinct fanfare (SFX_1UP); every other pickup
+    // shares one generic "powerup" jingle.
+    Audio_playSfx(type == POWERUP_1UP ? SFX_1UP : SFX_POWERUP);
+
     switch (type)
     {
         case POWERUP_LASER:  Player_pickupWeapon(player, WEAPON_LASER);  break;
@@ -194,7 +268,7 @@ static void resolvePlayerBulletsVsBoss(Boss* boss)
         if (!p->active || p->owner != PROJECTILE_OWNER_PLAYER)
             continue;
 
-        for (u8 v = 0; v < boss->vulnerablePointCount; v++)
+        for (u8 v = 0; v < boss->def->vulnerablePointCount; v++)
         {
             if (!Collision_overlaps(projectileBox(p), bossVulnerablePointBox(boss, v)))
                 continue;
@@ -226,6 +300,8 @@ void Combat_resolveCollisions(Player* player, Boss* boss)
     resolvePlayerBulletsVsEnemies();
     resolveEnemyBulletsVsPlayer(player);
     resolveEnemyContactVsPlayer(player);
+    resolvePlayerBulletsVsAsteroids();
+    resolveAsteroidContactVsPlayer(player);
     resolvePlayerVsPowerups(player);
     resolvePlayerBulletsVsBoss(boss);
     resolveBossContactVsPlayer(boss, player);

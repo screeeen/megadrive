@@ -1,6 +1,7 @@
 #include "weapon.h"
 #include "projectile.h"
 #include "resources.h"
+#include "audio.h"
 
 // SPEC.md §7 gives relative behavior per weapon ("high cadence", "fast",
 // "short range", "high damage"...) but no exact frame counts, speeds or
@@ -165,6 +166,8 @@ void Weapon_update(Player* player, const InputState* input)
 
     if (!input->a || cooldown != 0)
         return;
+
+    Audio_playSfx(SFX_SHOT);
 
     switch (player->weapon)
     {

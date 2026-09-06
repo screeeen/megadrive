@@ -617,61 +617,61 @@ music
 
 ## NS-M08-001 — Background
 
-* [ ] skyline
-* [ ] buildings
-* [ ] traffic
-* [ ] defense towers
-* [ ] space
+* [~] skyline — approximated by the repeating building-silhouette tile, not a distinct skyline layer (Genesis has only 2 tile planes; BG_A is committed to text/HUD)
+* [x] buildings — bg_building.png, an 8x8 silhouette tile mixed into the BG_B scroll
+* [ ] traffic — not implemented, no moving-foreground-detail concept exists
+* [ ] defense towers — not implemented; no stage-embedded (non-enemy) obstacle concept exists yet (see PROGRESS.md NS-9)
+* [x] space — the original testStage starfield, reused as the base layer
 
 ## NS-M08-002 — Stage length
 
-`38,400 px`
+`38,400 px` — [x] exact (stage1.lengthFrames = 19200 @ 2px/frame)
 
 ## NS-M08-003 — Intro
 
-* [ ] max 5 enemies
-* [ ] movement teaching
-* [ ] shooting teaching
-* [ ] first power-up
+* [x] max 5 enemies — 0-25% band caps at ~5 simultaneous (Drone/Fighter only)
+* [x] movement teaching — simple single/triple Drone formations
+* [x] shooting teaching — Fighters return fire, teaching dodge-and-shoot
+* [x] first power-up — POWERUP_P at frame 840
 
 ## NS-M08-004 — Turret section
 
-* [ ] bursts up to 8
-* [ ] peaks up to 12
+* [~] bursts up to 8 — design target baked into stage1_data.c's 25-50% band spacing; not hardware-enforced or measured against, see PROGRESS.md's stage1_data.c header note (honest pacing placeholder, not verified exact compliance)
+* [~] peaks up to 12 — same caveat
 
 ## NS-M08-005 — Combination section
 
-* [ ] up to 10 enemies
-* [ ] up to 18 bullets
+* [~] up to 10 enemies — 50-75% band's Fighter+Turret+Swarm combos target this; same measured-vs-designed caveat as NS-M08-004
+* [~] up to 18 bullets — same caveat
 
 ## NS-M08-006 — Boss preparation
 
-* [ ] max 12 enemies
-* [ ] max 20 bullets
+* [~] max 12 enemies — 75-100% band (= ENEMY_POOL_SIZE, the engine's hard global cap); same measured-vs-designed caveat
+* [~] max 20 bullets — same caveat
 
 ## NS-M08-007 — Mini-boss
 
-* [ ] implement
-* [ ] validate
+* [x] implement — ENEMY_MINIBOSS (enemy.h/.c: 15 HP, 5000 score, burst fire), placed at frame 16200
+* [x] validate — confirmed by user: spawns, fires, dies for its score
 
 ## NS-M08-008 — Orbital Guardian
 
-* [ ] ~250 HP
-* [ ] 3 phases
-* [ ] ~75 sec
-* [ ] cannons
-* [ ] drones
-* [ ] diagonal attacks
+* [x] ~250 HP — ORBITAL_GUARDIAN_MAX_HP = 250 (game_state.c)
+* [x] 3 phases — boss.c phase 1/2/3, thresholds at 2/3 and 1/3 HP (boss_logic.c, unit tested)
+* [~] ~75 sec — not measured/tuned against a clock; ATTACK/TELEGRAPH/VULNERABLE frame counts were chosen values (see PROGRESS.md DECISIONS), not derived from this target
+* [x] cannons — phase 1: frontal diagonal cannon fire
+* [x] drones — phase 2: spawns ENEMY_DRONE
+* [x] diagonal attacks — phase 3: double diagonal fire
 
 ## NS-M08-009 — Stage validation
 
-* [ ] 90–120 kills
-* [ ] 4 enemy types
-* [ ] 12 power-ups
-* [ ] 1UP
-* [ ] 2 checkpoints
-* [ ] boss
-* [ ] 60 FPS
+* [ ] 90–120 kills — not counted/verified (44 enemy spawn events exist, not all necessarily killed by every playthrough)
+* [x] 4 enemy types — Drone/Fighter/Turret/Swarm all used in stage1Events (Bomber/Charger/Shield exist but aren't placed in Stage 1's table)
+* [ ] 12 power-ups — 9 SPAWN_TYPE_POWERUP events in stage1Events, not 12; under target, not yet revisited
+* [x] 1UP — one POWERUP_1UP event at frame 4800
+* [x] 2 checkpoints — checkpointFrames = { 7680, 14400 } (~40%/~75%)
+* [x] boss — Orbital Guardian, full state machine, confirmed working end-to-end
+* [ ] 60 FPS — never measured (see PROGRESS.md Performance Notes: UNKNOWN, M17's job)
 
 ---
 
@@ -679,17 +679,17 @@ music
 
 ## NS-M09-001 — Boss base
 
-Implement:
+Implement: [x] all fields present on the Boss struct (inc/boss.h)
 
 ```text
-position
-hp
-phase
-timer
-vulnerable_points
-attack_pattern
-state
-sprite_parts
+position           -> x, y
+hp                 -> hp, maxHp
+phase              -> phase
+timer              -> timer
+vulnerable_points   -> def->vulnerablePoints/vulnerablePointCount (BossDef, not Boss itself — see PROGRESS.md M09)
+attack_pattern      -> def->phaseAttacks/phaseCount (BossDef)
+state               -> state (BossState)
+sprite_parts        -> spriteParts[1]
 ```
 
 ## NS-M09-002 — Boss state machine
@@ -705,32 +705,32 @@ DEATH
 
 ## NS-M09-003 — Vulnerable points
 
-* [ ] independent collision
-* [ ] damage
+* [x] independent collision — each of BossDef's vulnerablePoints is checked separately in combat.c's resolvePlayerBulletsVsBoss
+* [x] damage — shared HP pool (Boss_applyDamage), not per-point HP (see PROGRESS.md DECISIONS for why that's a deliberate simplification)
 
 ## NS-M09-004 — Pattern manager
 
-* [ ] deterministic
-* [ ] cooldowns
-* [ ] telegraphs
-* [ ] transitions
+* [x] deterministic — fixed frame counters (ATTACK_FIRE_EVERY, etc.), no RNG
+* [x] cooldowns — ATTACK_FRAMES/ATTACK_FIRE_EVERY
+* [x] telegraphs — BOSS_STATE_TELEGRAPH (blink) before every VULNERABLE window
+* [x] transitions — BOSS_STATE_TRANSITION on every phase change
 
 ## NS-M09-005 — Boss HUD
 
-* [ ] optional health bar
-* [ ] never obscure gameplay
+* [x] optional health bar — text readout ("BOSS HP:xxx/xxx"), not a graphical bar; added at M08, gated by nothing (always shown during STATE_BOSS) — a real graphical bar is later-milestone polish, see PROGRESS.md
+* [x] never obscure gameplay — drawn at the top-left corner (row 1), clear of the play area and away from other HUD text
 
 ## NS-M09-006 — Boss death
 
-* [ ] stop attacks
-* [ ] explosions
-* [ ] score
-* [ ] music
-* [ ] transition
+* [x] stop attacks — DEATH state fires nothing, no further ATTACK/TELEGRAPH/VULNERABLE cycling
+* [~] explosions — no dedicated explosion sprite/particle system exists; a fast strobe blink of the boss's own sprite is the honest placeholder added this milestone (see PROGRESS.md)
+* [x] score — boss->score awarded (with combo multiplier) once Boss_isEncounterOver()
+* [ ] music — no distinct boss-death/victory music exists; only M15's placeholder arpeggio melody plays throughout, unchanged on death
+* [x] transition — STATE_BOSS -> STATE_STAGE_CLEAR
 
 ## NS-M09-007 — Framework regression
 
-* [ ] Stage 1 boss still works
+* [x] Stage 1 boss still works — confirmed after the BossDef refactor; also where a real crash (NS-12) was found and fixed this milestone (see PROGRESS.md)
 
 ---
 
@@ -738,94 +738,94 @@ DEATH
 
 ## NS-M10-001 — Stage 2 background
 
-* [ ] red desert
-* [ ] canyons
-* [ ] storms
-* [ ] bases
-* [ ] convoys
+* [x] red desert — dune silhouette tile, backgroundId=2 (scroll.c)
+* [ ] canyons — not implemented
+* [ ] storms — no visibility/fog mechanic exists in the engine (NS-15)
+* [ ] bases — not implemented
+* [ ] convoys — not implemented
 
 ## NS-M10-002 — Stage 2 length
 
-`43,200 px`
+`43,200 px` — [x] exact (stage2.lengthFrames = 21600 @ 2px/frame)
 
 ## NS-M10-003 — Stage 2 metrics
 
-* [ ] 120–150 kills
-* [ ] 5 types
-* [ ] <=30 bullets
-* [ ] 12 power-ups
-* [ ] 1UP
-* [ ] 2 checkpoints
+* [ ] 120–150 kills — 36 enemy spawn events in stage2_data.c, not counted against actual kills; under the design target (same honest gap as Stage 1's own table, see PROGRESS.md)
+* [x] 5 types — Drone/Fighter/Turret/Swarm/Charger, matching the target count exactly
+* [ ] <=30 bullets — design assumption baked into event spacing, not measured or hardware-enforced per stage
+* [ ] 12 power-ups — 9 SPAWN_TYPE_POWERUP events in stage2_data.c, under target
+* [x] 1UP — one POWERUP_1UP event
+* [x] 2 checkpoints — checkpointFrames = { 8640, 16200 }
 
 ## NS-M10-004 — Storm sections
 
-* [ ] visibility effect
-* [ ] attacks remain readable
+* [ ] visibility effect — no visibility/fog mechanic exists (NS-15)
+* [ ] attacks remain readable — N/A, no storm effect exists to keep readable
 
 ## NS-M10-005 — Destructible obstacles
 
-* [ ] collision
-* [ ] destruction
-* [ ] visual feedback
+* [ ] collision — no obstacle entity/concept exists in the engine (same root gap as NS-9)
+* [ ] destruction — N/A
+* [ ] visual feedback — N/A
 
 ## NS-M10-006 — Sand Worm
 
-* [ ] ~350 HP
-* [ ] 3 phases
-* [ ] 80–90 sec
-* [ ] charge
-* [ ] vertical projectiles
-* [ ] both-side attacks
+* [x] ~350 HP — sandWormDef.maxHp = 350 (boss_data.c)
+* [x] 3 phases — same generic boss.c state machine as Orbital Guardian, phase thresholds at 2/3 and 1/3 HP
+* [~] 80–90 sec — not measured/tuned against a clock, same caveat as Orbital Guardian's own duration target
+* [x] charge — phase1: BulletPattern_burst, approximated (see PROGRESS.md NS-13 — the boss doesn't move, so a real charge/dash isn't modeled)
+* [x] vertical projectiles — phase2: BulletPattern_topBottom, direct match
+* [~] both-side attacks — phase3: BulletPattern_cross (4 directions), an approximation since the boss has no left/right positioning to attack "from both sides" of (NS-13)
 
 ## NS-M10-007 — Stage 2 validation
 
-* [ ] gameplay
-* [ ] boss
-* [ ] performance
-* [ ] visuals
+* [x] gameplay — confirmed by user (background/boss change correctly on Stage 1 -> Stage 2)
+* [x] boss — Sand Worm fight confirmed working (intro/phases/attacks/death) as part of the full 3-boss loop test
+* [ ] performance — not stress-tested (M17's job)
+* [x] visuals — dune background and Sand Worm sprite both confirmed by user
 
 ## NS-M10-008 — Stage 3 background
 
-* [ ] corridors
-* [ ] doors
-* [ ] pipes
-* [ ] machinery
-* [ ] moving obstacles
+* [x] corridors — approximated by vertical pipe columns, backgroundId=3 (scroll.c)
+* [ ] doors — not implemented
+* [x] pipes — the pipe tile itself is the implemented element
+* [ ] machinery — not implemented beyond the pipe tile
+* [ ] moving obstacles — no obstacle entity/concept exists in the engine (NS-9/NS-15)
 
 ## NS-M10-009 — Stage 3 length
 
-`48,000 px`
+`48,000 px` — [x] exact (stage3.lengthFrames = 24000 @ 2px/frame)
 
 ## NS-M10-010 — Stage 3 metrics
 
-* [ ] 130–170 kills
-* [ ] 6 types
-* [ ] <=40 bullets
-* [ ] 14 power-ups
-* [ ] 0–1 1UP
-* [ ] 2 checkpoints
+* [ ] 130–170 kills — 38 enemy spawn events in stage3_data.c, not counted against actual kills; under the design target
+* [x] 6 types — Fighter/Turret/Swarm/Charger/Shield/Bomber, matching the target count exactly
+* [ ] <=40 bullets — design assumption, not measured or hardware-enforced per stage
+* [ ] 14 power-ups — 9 SPAWN_TYPE_POWERUP events in stage3_data.c, under target
+* [x] 0–1 1UP — zero POWERUP_1UP events placed (0 is within the spec'd 0-1 range)
+* [x] 2 checkpoints — checkpointFrames = { 9600, 18000 }
 
 ## NS-M10-011 — Stage 3 scroll
 
-`2–3 px/frame`
+`2–3 px/frame` — [~] flattened to a single 2 (StageDef has one scrollSpeed field, no mid-stage ramp mechanism — NS-M07-005)
 
 ## NS-M10-012 — Vertical space
 
-Normally maintain >=48 px free space except telegraphed patterns.
+Normally maintain >=48 px free space except telegraphed patterns. [ ] Not enforced — no obstacle/safe-zone system exists to constrain (N/A until NS-9/NS-15 is addressed)
 
 ## NS-M10-013 — Industrial Core
 
-* [ ] ~450 HP
-* [ ] ~90 sec
-* [ ] mechanical arms
-* [ ] changing safe areas
+* [x] ~450 HP — industrialCoreDef.maxHp = 450 (boss_data.c)
+* [~] ~90 sec — not measured/tuned against a clock, same caveat as every other boss's duration target
+* [~] mechanical arms — approximated as a stationary ENEMY_TURRET spawn (phase2), not a real per-boss "arm" entity (NS-13)
+* [ ] changing safe areas — no dynamic safe-zone concept exists in the engine (NS-13)
 
 ## NS-M10-014 — Stage 3 validation
 
-* [ ] gameplay
-* [ ] boss
-* [ ] performance
-* [ ] visuals
+* [x] gameplay — confirmed by user as part of the full 3-stage/3-boss loop test ("todo ok")
+* [x] boss — Industrial Core fight confirmed working (intro/phases/attacks/death)
+* [ ] performance — not stress-tested (M17's job)
+* [x] visuals — pipe background and Industrial Core sprite both confirmed by user
 
 ---
 
@@ -833,111 +833,111 @@ Normally maintain >=48 px free space except telegraphed patterns.
 
 ## NS-M11-001 — Asteroid background
 
-* [ ] stars
-* [ ] asteroids
-* [ ] mines
-* [ ] mining ships
+* [x] stars — plain starfield reused (backgroundId=4, no dedicated asteroid-field art — see PROGRESS.md)
+* [x] asteroids — the real, gameplay-relevant visual content: 3 sizes (asteroid.c), spawned as real entities, not background decoration
+* [ ] mines — approximated by the Mining Fortress boss's phase2 attack (a spawned small Asteroid), not a stage-hazard mine
+* [ ] mining ships — not implemented, no such entity exists
 
 ## NS-M11-002 — Stage 4 length
 
-`52,800 px`
+`52,800 px` — [x] exact (stage4.lengthFrames = 17600 @ 3px/frame)
 
 ## NS-M11-003 — Stage 4 scroll
 
-* [ ] 3 px/frame normal
-* [ ] 4 px/frame maximum
+* [x] 3 px/frame normal — stage4.scrollSpeed = 3
+* [ ] 4 px/frame maximum — not modeled, StageDef has one flat scrollSpeed field, no mid-stage ramp (NS-M07-005)
 
 ## NS-M11-004 — Asteroid distribution
 
-* [ ] 70% small
-* [ ] 25% medium
-* [ ] 5% large
+* [~] 70% small — stage4_data.c: 13/19 (68%), close to target
+* [~] 25% medium — 3/19 (16%), under target
+* [~] 5% large — 3/19 (16%), over target (see PROGRESS.md — an honest placeholder table, not tuned to hit the exact ratio)
 
 ## NS-M11-005 — Stage 4 metrics
 
-* [ ] 35–50 asteroids
-* [ ] 140–180 kills
-* [ ] 7 enemy types
-* [ ] <=50 bullets
-* [ ] <=15 obstacles
+* [ ] 35–50 asteroids — 19 total asteroid spawn events, under target
+* [ ] 140–180 kills — 21 enemy spawn events, not counted against actual kills; under the design target (same honest gap as every earlier stage's own table)
+* [x] 7 enemy types — Drone/Fighter/Bomber/Turret/Swarm/Charger/Shield, matching the target count exactly (ENEMY_MINIBOSS also appears for the mini-boss requirement, counted separately)
+* [ ] <=50 bullets — design assumption, not measured or hardware-enforced per stage
+* [x] <=15 obstacles — ASTEROID_POOL_SIZE = 15 is a hard engine cap, always respected
 
 ## NS-M11-006 — Destructible asteroids
 
-* [ ] collision
-* [ ] destruction
-* [ ] effects
+* [x] collision — resolvePlayerBulletsVsAsteroids/resolveAsteroidContactVsPlayer (combat.c)
+* [x] destruction — Asteroid_hit releases the sprite and awards score for small/medium; large ones are never destroyed (SPEC.md §19)
+* [ ] effects — no destruction visual effect (explosion/particle) exists, same gap as every other entity's death in this engine (M16's job)
 
 ## NS-M11-007 — Mining Fortress
 
-* [ ] ~550 HP
-* [ ] 90–100 sec
-* [ ] cannons
-* [ ] mines
-* [ ] drones
-* [ ] exposed core
+* [x] ~550 HP — miningFortressDef.maxHp = 550 (boss_data.c)
+* [~] 90–100 sec — not measured/tuned against a clock, same caveat as every other boss's duration target
+* [x] cannons — phase1: BulletPattern_diagonal
+* [~] mines — phase2: spawns a small Asteroid as an approximation (see PROGRESS.md NS-13-style simplification note)
+* [x] drones — phase3: spawns 2x ENEMY_DRONE
+* [x] exposed core — the "nucleo vulnerable" vulnerable-point rectangle, centered on the sprite
 
 ## NS-M11-008 — Stage 4 validation
 
-* [ ] gameplay
-* [ ] boss
-* [ ] performance
-* [ ] visuals
+* [x] gameplay — confirmed by user as part of the full 5-stage/5-boss loop test
+* [x] boss — Mining Fortress fight confirmed working (intro/phases/attacks/death)
+* [ ] performance — not stress-tested (M17's job)
+* [x] visuals — Mining Fortress sprite confirmed by user; asteroid visibility was reported as an issue and investigated but not conclusively resolved (see PROGRESS.md NS-16)
 
 ## NS-M11-009 — Helios Fleet background
 
-* [ ] large battle
-* [ ] ships
-* [ ] projectiles
-* [ ] background depth
+* [x] large battle — high enemy density from the very start of the table (no low-density intro band, unlike every earlier stage)
+* [ ] ships — no distinct "ship" background art, plain starfield reused (backgroundId=5)
+* [ ] projectiles — N/A to background art specifically
+* [ ] background depth — single BG_B layer only, same limit as every stage (Genesis has 2 tile planes, BG_A hosts text/HUD — see M07's PROGRESS.md note)
 
 ## NS-M11-010 — Formations
 
-* [ ] diagonal
-* [ ] V
-* [ ] lines
-* [ ] circles
-* [ ] crossed
-* [ ] waves
+* [x] diagonal — staggered frame+y multi-Fighter SpawnEvents
+* [x] V — converging-y multi-Fighter SpawnEvents
+* [x] lines — same-frame multi-enemy SpawnEvents at a shared frame
+* [ ] circles — approximated only as a "circle-ish cluster" (4 Swarm at once, no literal ring layout); BulletPattern_circular exists for *bullets*, not enemy *formations*
+* [x] crossed — 4-lane same-frame Fighter spawn ("cross-attack formation")
+* [x] waves — staggered-frame ascending-y Fighter spawns
 
 ## NS-M11-011 — Stage 5 length
 
-`57,600 px`
+`57,600 px` — [x] exact (stage5.lengthFrames = 19200 @ 3px/frame)
 
 ## NS-M11-012 — Stage 5 metrics
 
-* [ ] 180–230 kills
-* [ ] 8 enemy types
-* [ ] <=65 bullets
-* [ ] 16 power-ups
-* [ ] 1UP
-* [ ] 2 checkpoints
-* [ ] 2 mini-bosses
+* [ ] 180–230 kills — 39 enemy spawn events (after the Drone fix), not counted against actual kills; under the design target
+* [x] 8 enemy types — all 7 combat types (Drone/Fighter/Bomber/Turret/Swarm/Charger/Shield) + ENEMY_MINIBOSS, see PROGRESS.md for why this honestly reaches "8" without inventing "Cruceros"/"Misiles"
+* [ ] <=65 bullets — design assumption, not measured or hardware-enforced per stage
+* [ ] 16 power-ups — 9 SPAWN_TYPE_POWERUP events, under target
+* [x] 1UP — one POWERUP_1UP event
+* [x] 2 checkpoints — checkpointFrames = { 7680, 14400 }
+* [x] 2 mini-bosses — two separate ENEMY_MINIBOSS spawn events, matching the target exactly
 
 ## NS-M11-013 — Escape routes
 
-Every dense pattern must retain at least one viable route.
+Every dense pattern must retain at least one viable route. [ ] Not verified/tuned — no automated or manual playtest specifically checked this; same caveat as every other "feel" requirement in this project
 
 ## NS-M11-014 — Admiral X
 
-* [ ] ~650 HP
-* [ ] 100–110 sec
-* [ ] projectile patterns
-* [ ] fighter formations
-* [ ] phase changes
+* [x] ~650 HP — admiralXDef.maxHp = 650 (boss_data.c)
+* [~] 100–110 sec — not measured/tuned against a clock
+* [x] projectile patterns — phase1 aimed, phase3 circular barrage
+* [x] fighter formations — phase2 spawns an ENEMY_FIGHTER escort (a single spawn, not a multi-ship formation — SPEC.md gives no per-phase breakdown for this boss, see PROGRESS.md)
+* [x] phase changes — same generic boss.c state machine as every other boss
 
 ## NS-M11-015 — Boss validation
 
-* [ ] patterns
-* [ ] phases
-* [ ] collision
-* [ ] performance
+* [x] patterns — confirmed working as part of the full 5-boss loop test
+* [x] phases — phase transitions at 2/3 and 1/3 HP confirmed (shared, tested Boss_applyDamage logic)
+* [x] collision — vulnerable-point hits confirmed landing and dealing damage
+* [ ] performance — not stress-tested (M17's job)
 
 ## NS-M11-016 — Stage 5 validation
 
-* [ ] complete playthrough
-* [ ] metrics
-* [ ] visuals
-* [ ] performance
+* [x] complete playthrough — confirmed by user as part of the full 5-stage/5-boss loop test
+* [ ] metrics — not measured against the numeric targets (kills/bullets/power-ups all under target, see NS-M11-012)
+* [x] visuals — Admiral X sprite and dense enemy formations confirmed by user
+* [ ] performance — not stress-tested (M17's job)
 
 ---
 
@@ -945,55 +945,55 @@ Every dense pattern must retain at least one viable route.
 
 ## NS-M12-001 — Helios Core background
 
-* [ ] black
-* [ ] red
-* [ ] white
-* [ ] energy
-* [ ] machinery
+* [ ] black — no distinct background art beyond the plain starfield's own black backdrop
+* [ ] red — not in the background art (present in the Helios boss sprite itself)
+* [ ] white — not in the background art (present in the Helios boss sprite itself)
+* [ ] energy — not implemented, no such visual effect exists
+* [ ] machinery — not implemented, plain starfield reused (backgroundId=6, see PROGRESS.md — Helios's own sprite carries the stage's stated palette instead)
 
 ## NS-M12-002 — Stage length
 
-`48,000 px`
+`48,000 px` — [x] exact (stage6.lengthFrames = 16000 @ 3px/frame)
 
 ## NS-M12-003 — Stage metrics
 
-* [ ] 160–200 kills
-* [ ] 9 types
-* [ ] <=80 bullets
-* [ ] 12 power-ups
-* [ ] 0 1UP
-* [ ] 2 checkpoints
-* [ ] 2 mini-bosses
+* [ ] 160–200 kills — 36 enemy spawn events, not counted against actual kills; under the design target
+* [x] 9 types — 7 combat types + ENEMY_MINIBOSS + M11's Asteroid system (as "obstaculos"), see PROGRESS.md for the honest reasoning behind counting a non-enemy hazard toward this
+* [ ] <=80 bullets — design assumption, not measured or hardware-enforced per stage
+* [ ] 12 power-ups — 7 SPAWN_TYPE_POWERUP events, under target
+* [x] 0 1UP — zero POWERUP_1UP events placed, matching the target exactly
+* [x] 2 checkpoints — checkpointFrames = { 6400, 12000 }
+* [x] 2 mini-bosses — two separate ENEMY_MINIBOSS spawn events, matching the target exactly
 
 ## NS-M12-004 — Scroll
 
-`2 → 3 → 4 px/frame` selectively.
+`2 → 3 → 4 px/frame` selectively. [~] Flattened to a single 3 (the range's mid-point) — StageDef has one flat scrollSpeed field, no mid-stage ramp mechanism (NS-M07-005, same gap as every earlier variable-speed stage)
 
 ## NS-M12-005 — Obstacles
 
-* [ ] lasers
-* [ ] walls
-* [ ] energy barriers
-* [ ] fast enemies
-* [ ] dense patterns
+* [ ] lasers — no dedicated environmental-hazard entity exists; approximated by the existing Laser weapon power-up being available (NS-9/NS-15)
+* [ ] walls — not implemented, no scenery-obstacle system exists (NS-9/NS-15)
+* [ ] energy barriers — not implemented, same gap
+* [x] fast enemies — leans on ENEMY_CHARGER (the roster's fastest existing type) placed throughout the table, rather than a new speed-override mechanism
+* [x] dense patterns — no low-density intro band, unlike every earlier stage (SPEC.md: this stage is the campaign's climax)
 
 ## NS-M12-006 — Difficulty
 
 Use:
 
-* [ ] patterns
-* [ ] positioning
-* [ ] speed
-* [ ] combinations
+* [x] patterns — existing bullet_pattern.c variety, no new patterns needed
+* [x] positioning — asteroid obstacles (large, indestructible) force navigation choices
+* [x] speed — Charger-heavy placement
+* [x] combinations — Shield+Bomber+Turret+Fighter mixed spawns throughout
 
-Avoid excessive HP.
+Avoid excessive HP. [x] No enemy HP values were changed for this stage — difficulty comes entirely from placement/density/type mix, per SPEC.md's own explicit direction
 
 ## NS-M12-007 — Stage validation
 
-* [ ] <=80 bullets
-* [ ] <=12 enemies
-* [ ] escape routes
-* [ ] 60 FPS
+* [ ] <=80 bullets — not measured (design assumption only)
+* [x] <=12 enemies — ENEMY_POOL_SIZE = 12 is a hard engine cap, always respected
+* [ ] escape routes — not verified/tuned, no automated or manual playtest specifically checked this (same caveat as NS-M11-013)
+* [ ] 60 FPS — never measured (M17's job)
 
 ---
 
@@ -1001,9 +1001,9 @@ Avoid excessive HP.
 
 ## NS-M13-001 — HELIOS sprite
 
-* [ ] large silhouette
-* [ ] multiple hardware sprites
-* [ ] readable core
+* [ ] large silhouette — 32x32, same size as every other boss (the largest single Genesis hardware sprite), not a larger multi-part composition
+* [ ] multiple hardware sprites — spriteParts[1] (single part), same as every other boss; SPEC.md §31's "reusable blocks" composition isn't used here either
+* [x] readable core — the vulnerable-point rectangles are clear sub-regions; white (a new 4th palette color, see PROGRESS.md) marks the visual core
 
 ## NS-M13-002 — Boss structure
 
@@ -1014,51 +1014,53 @@ PHASE_3
 DEATH
 ```
 
+[x] Same generic BossState machine every boss already uses (boss.c, unchanged since M09) — INTRO/ATTACK/TELEGRAPH/VULNERABLE/TRANSITION/DEATH, phase 1-3 via HP thresholds
+
 ## NS-M13-003 — Phase 1
 
-* [ ] 30–35 sec
-* [ ] cannons
-* [ ] drones
-* [ ] missiles
-* [ ] <=35 bullets
+* [~] 30–35 sec — not measured/tuned against a clock, same caveat as every other boss's duration target
+* [x] cannons — BulletPattern_diagonal
+* [x] drones — spawns ENEMY_DRONE
+* [~] missiles — approximated via BulletPattern_aimed (no true homing exists — NS-4)
+* [ ] <=35 bullets — design assumption, not measured or hardware-enforced per phase
 
 ## NS-M13-004 — Phase 2
 
-* [ ] 30–40 sec
-* [ ] circular attacks
-* [ ] positional attacks
-* [ ] <=55 bullets
+* [~] 30–40 sec — not measured/tuned against a clock
+* [x] circular attacks — BulletPattern_circular
+* [~] positional attacks — approximated via BulletPattern_wave ("barridos"); no true player-position-relative sweep exists
+* [ ] <=55 bullets — design assumption, not measured or hardware-enforced per phase
 
 ## NS-M13-005 — Phase 3
 
-* [ ] 35–45 sec
-* [ ] exposed core
-* [ ] smaller safe zone
-* [ ] openings
-* [ ] <=70 bullets
+* [~] 35–45 sec — not measured/tuned against a clock
+* [x] exposed core — the framework's existing vulnerable-point system (nothing extra needed, same reading as every earlier boss)
+* [ ] smaller safe zone — no dynamic safe-zone system exists (NS-13's already-tracked gap, same as Industrial Core's arms)
+* [ ] openings — N/A without a real safe-zone system to open/close
+* [ ] <=70 bullets — design assumption, not measured or hardware-enforced per phase
 
 ## NS-M13-006 — Escape routes
 
-* [ ] every pattern has escape
-* [ ] telegraphs
-* [ ] no impossible combinations
+* [ ] every pattern has escape — not verified/tuned, same caveat as NS-M11-013/NS-M12-007
+* [x] telegraphs — TELEGRAPH state (blink) before every VULNERABLE window, same as every boss
+* [ ] no impossible combinations — not formally verified (no automated pattern-safety check exists)
 
 ## NS-M13-007 — Final death
 
-* [ ] stop attacks
-* [ ] stop scroll
-* [ ] explosion
-* [ ] ending
-* [ ] ranking
-* [ ] credits
+* [x] stop attacks — DEATH state fires nothing, same as every boss
+* [x] stop scroll — STATE_ENDING/STATE_CREDITS never call Scroll_update()
+* [~] explosion — no dedicated explosion sprite/particle system exists (M16's job); the boss's existing DEATH-state strobe (M09) is the visual beat under the "HELIOS DESTROYED" text
+* [x] ending — STATE_ENDING -> STATE_CREDITS -> STATE_TITLE, real behavior added this milestone (both states existed unused since M01)
+* [~] ranking — shows the run's final score, not a persistent leaderboard (NS-17: no save mechanism exists anywhere in this project)
+* [x] credits — "NEON STRIKE" / "THE END" / "FINAL SCORE:N" / "PRESS START"
 
 ## NS-M13-008 — Final boss validation
 
-* [ ] 100–120 sec
-* [ ] 3 phases
-* [ ] <=70 bullets
-* [ ] no impossible patterns
-* [ ] 60 FPS
+* [ ] 100–120 sec — not measured/tuned against a clock
+* [x] 3 phases — confirmed via the shared, unit-tested Boss_applyDamage phase-threshold logic (same code every boss uses)
+* [ ] <=70 bullets — not measured (design assumption only)
+* [ ] no impossible patterns — not formally verified
+* [ ] 60 FPS — never measured (M17's job)
 
 ---
 
@@ -1066,11 +1068,13 @@ DEATH
 
 ## NS-M14-001 — HUD
 
-Implement:
+Implement: [x] real, always-on (game_state.c's drawHud()), not SHOW_DEBUG_HUD-gated
 
 ```text
 SCORE 00124500 HI 9999999
 ```
+
+[x] SCORE (left) and HI (right corner, user-requested layout) both zero-padded to 8 digits, row 0
 
 ## NS-M14-002 — Bottom HUD
 
@@ -1079,6 +1083,10 @@ POWER ███
 WEAPON LASER
 BOMB ×2
 ```
+
+* [x] POWER — a '#'-per-weapon-level bar (no bar-drawing tile exists), immediately after the weapon name rather than its own labeled field (a labeled version overflowed the 40-column plane — see PROGRESS.md)
+* [x] WEAPON — weapon name text
+* [x] BOMB — count, plus LIVES and combo multiplier folded into the same row (not itemized in MILESTONES.md's snippet but clearly needed)
 
 ## NS-M14-003 — Score values
 
@@ -1092,45 +1100,47 @@ Mini-boss   5000
 Boss        50000
 ```
 
+[x] Unchanged since M05/M06 (enemy.c/boss_data.c constants) — all match SPEC.md §23 exactly, already verified when each was introduced
+
 ## NS-M14-004 — High score
 
-* [ ] session high score
-* [ ] display
-* [ ] reset
+* [x] session high score — score.c's Score_getHigh(), updated inline in Score_add()
+* [x] display — HUD row 0, right corner
+* [x] reset — deliberately NOT reset by Score_reset() (only a power cycle resets it); see PROGRESS.md for why "session" reads that way here
 
 ## NS-M14-005 — Lives/continues
 
-* [ ] 3 lives
-* [ ] 3 continues
-* [ ] checkpoint return
-* [ ] weapon L1
-* [ ] one bomb retained
+* [x] 3 lives — PLAYER_INITIAL_LIVES (player.h, since M02)
+* [x] 3 continues — INITIAL_CONTINUES (game_state.c, since M06)
+* [x] checkpoint return — respawnAtCheckpoint()/SpawnManager_resumeFromCheckpoint (since M07)
+* [x] weapon L1 — Player_respawn/Continue_resume both reset to WEAPON_VULCAN L1
+* [x] one bomb retained — Continue_resume() sets player.bombs = 1 (since M06)
 
 ## NS-M14-006 — Checkpoint restoration
 
-* [ ] reset enemies
-* [ ] reset bullets
-* [ ] reset dynamic obstacles
-* [ ] restore scroll
+* [x] reset enemies — Enemy_releaseAll/poolInit (resetGameplayPools, since M07)
+* [x] reset bullets — Projectile_releaseAll/poolInit (resetGameplayPools, since M07)
+* [x] reset dynamic obstacles — Asteroid_releaseAll/poolInit (resetGameplayPools, since M11)
+* [x] restore scroll — Scroll_init(currentStage->backgroundId) (resetGameplayPools, since M07)
 
 ## NS-M14-007 — Stage clear
 
-* [ ] score bonus
-* [ ] transition
-* [ ] next stage
+* [x] score bonus — STAGE_CLEAR_BONUS = 1000 (flat, chosen — GAME_SPEC.md gives no exact value), awarded and shown ("BONUS:1000") in StageClear_enter()
+* [x] transition — STATE_STAGE_CLEAR -> STATE_NEXT_STAGE (since M07)
+* [x] next stage — NextStage_resume() advances stageIndex (since M10)
 
 ## NS-M14-008 — Game over
 
-* [ ] GAME OVER
-* [ ] continue
-* [ ] title
+* [x] GAME OVER — GameOver_enter() (since M02/M06)
+* [x] continue — STATE_CONTINUE (since M06)
+* [x] title — STATE_TITLE on exhausted continues (since M02)
 
 ## NS-M14-009 — Ending
 
-* [ ] victory
-* [ ] message
-* [ ] ranking
-* [ ] credits
+* [x] victory — "HELIOS DESTROYED"/"ORBIT SECURED" (Ending_enter(), M13)
+* [x] message — "NEON STRIKE"/"THE END" (Credits_enter(), M13)
+* [~] ranking — shows the run's final score, not a persistent leaderboard (NS-17: no save mechanism exists)
+* [x] credits — Credits_enter() (M13)
 
 ---
 
@@ -1141,67 +1151,69 @@ Boss        50000
 Verify:
 
 ```text
-68000 → audio commands
-Z80 → audio
-YM2612 → FM
-PSG → support/SFX
+68000 -> audio commands
+Z80 -> audio
+YM2612 -> FM
+PSG -> support/SFX
 ```
+
+[~] Only the PSG half of this architecture is used (channel 0 = music, channel 1 = tone SFX, channel 3 = noise SFX) — no YM2612/FM synthesis, no Z80-driven sample playback exists; this was already true of M00's original placeholder and remains true here, just with real distinct content on the PSG channels now instead of one reused arpeggio
 
 ## NS-M15-002 — Stage 1 music
 
-* [ ] functional theme
+* [x] functional theme — musicId=1, audio.c track1 (upbeat major)
 
 ## NS-M15-003 — Stage 2 music
 
-* [ ] functional theme
+* [x] functional theme — musicId=2, track2 (exotic/minor, slower)
 
 ## NS-M15-004 — Stage 3 music
 
-* [ ] functional theme
+* [x] functional theme — musicId=3, track3 (mechanical/staccato, fast)
 
 ## NS-M15-005 — Stage 4 music
 
-* [ ] functional theme
+* [x] functional theme — musicId=4, track4 (tense minor syncopation)
 
 ## NS-M15-006 — Stage 5 music
 
-* [ ] functional theme
+* [x] functional theme — musicId=5, track5 (heroic/triumphant, wide range)
 
 ## NS-M15-007 — Stage 6 music
 
-* [ ] functional theme
+* [x] functional theme — musicId=6, track6 (dark, driving, fast)
 
 ## NS-M15-008 — Boss themes
 
-* [ ] six boss themes
+* [~] six boss themes — simplified to one shared MUSIC_BOSS track (track7) reused by all 6 regular stage bosses, see PROGRESS.md for why 6 fully distinct tracks wasn't worth hand-authoring
 
 ## NS-M15-009 — Final boss theme
 
-* [ ] HELIOS theme
+* [x] HELIOS theme — MUSIC_FINAL_BOSS (track8), distinct from the shared boss theme, grander/wider range
 
 ## NS-M15-010 — Credits theme
 
-* [ ] credits music
+* [x] credits music — MUSIC_CREDITS (track9), gentle/resolving
 
 ## NS-M15-011 — SFX
 
-* [ ] shot
-* [ ] explosion
-* [ ] hit
-* [ ] power-up
-* [ ] bomb
-* [ ] boss
-* [ ] 1UP
-* [ ] player damage
-* [ ] stage clear
+* [x] shot — SFX_SHOT, Weapon_update on every fire
+* [x] explosion — SFX_EXPLOSION (noise channel), combat.c's onEnemyKilled (enemies + asteroids)
+* [x] hit — SFX_HIT, Player_hit (same event as "player damage" below — treated as one, see PROGRESS.md)
+* [x] power-up — SFX_POWERUP, applyPowerup (all types except 1UP)
+* [x] bomb — SFX_BOMB, Bomb_use
+* [x] boss — SFX_BOSS, game_state.c's boss-defeat branch (distinct from a regular SFX_EXPLOSION; in practice gets cut short by the SFX/music that follows it — see PROGRESS.md)
+* [x] 1UP — SFX_1UP, applyPowerup's POWERUP_1UP case
+* [x] player damage — same as "hit" above (SFX_HIT)
+* [x] stage clear — SFX_STAGE_CLEAR, StageClear_enter()
 
 ## NS-M15-012 — Audio validation
 
-* [ ] music
-* [ ] SFX
-* [ ] transitions
-* [ ] no crashes
-* [ ] no Z80 lockups
+* [x] music — confirmed by user: distinct themes per stage, boss music switch, credits theme, all audible in one playthrough
+* [x] SFX — confirmed by user: shot/explosion/powerup/bomb/hit all heard
+* [x] transitions — confirmed working (stage->boss->stage-clear->next-stage music switches correctly)
+* [x] no crashes — `make test` unchanged, BlastEm stable through the full test session
+* [ ] no Z80 lockups — N/A to verify meaningfully; no Z80-driven audio path is used at all (PSG only, driven directly from 68000 each frame)
 
 ---
 
@@ -1209,54 +1221,54 @@ PSG → support/SFX
 
 ## NS-M16-001 — Player effects
 
-* [ ] muzzle flash
-* [ ] damage flash
-* [ ] explosion
-* [ ] invulnerability feedback
+* [ ] muzzle flash — not implemented (projectiles appear at the gun position already, no extra flash sprite)
+* [x] damage flash — pre-existing invulnerability blink (player.c, since M02), unchanged
+* [x] explosion — Explosion_spawn(player.x, player.y) in PlayerHit_enter() (only on a life-costing hit)
+* [x] invulnerability feedback — same pre-existing blink, still real
 
 ## NS-M16-002 — Enemy effects
 
-* [ ] small explosion
-* [ ] large explosion
-* [ ] hit flash
-* [ ] boss damage feedback
+* [~] small explosion — one shared explosion.c effect for every size/type, not size-differentiated
+* [~] large explosion — same shared effect (see above); the boss defeat gets 3 spread across its footprint instead, a distinct-enough "large" version
+* [x] hit flash — new Enemy.hitFlashTimer, set in Enemy_hit() on a survived hit, blinked in Enemy_poolUpdate()
+* [x] boss damage feedback — the existing "VULNERABLE!" text/HP readout (M08) already covers this; no separate new feedback added
 
 ## NS-M16-003 — Power-up effects
 
-* [ ] spawn
-* [ ] pickup
-* [ ] audio
+* [ ] spawn — no spawn-in effect (power-ups simply appear and start drifting, unchanged since M06)
+* [x] pickup — SFX_POWERUP/SFX_1UP (M15); no additional visual pickup effect
+* [x] audio — SFX_POWERUP/SFX_1UP (M15)
 
 ## NS-M16-004 — Bomb effect
 
-* [ ] expanding explosion
-* [ ] projectile clear
-* [ ] screen feedback
-* [ ] sprite-safe
+* [~] expanding explosion — one Explosion_spawn() per enemy killed by the bomb, not a single expanding screen-wide effect
+* [x] projectile clear — pre-existing (bomb.c, since M06)
+* [x] screen feedback — pre-existing "BOMB!" text flash (game_state.c, since M06)
+* [x] sprite-safe — Explosion pool is a proper fixed-size pool with its own release lifecycle, same pattern as every other pool here
 
 ## NS-M16-005 — Boss effects
 
-* [ ] phase transition
-* [ ] warning
-* [ ] explosion
-* [ ] death sequence
+* [x] phase transition — new fast blink on BOSS_STATE_TRANSITION (boss.c), previously identical-looking to a solid ATTACK/VULNERABLE boss
+* [x] warning — same blink serves as the warning
+* [x] explosion — DEATH state now spawns a real Explosion every 15 frames across the boss's footprint (previously just a sprite strobe with no explosion sprite, since none existed before this milestone)
+* [x] death sequence — DEATH state's existing strobe (M09) + the new explosions + the 3-burst spread on final defeat (game_state.c)
 
 ## NS-M16-006 — Background polish
 
-* [ ] parallax
-* [ ] stars
-* [ ] traffic
-* [ ] machinery
-* [ ] atmosphere
+* [ ] parallax — unchanged since M07 (one BG_B layer); Genesis has only 2 tile planes and BG_A hosts text/HUD (see M07's PROGRESS.md note) — not revisited
+* [x] stars — pre-existing starfield (M07)
+* [ ] traffic — not implemented (NS-9/NS-15's tracked gap)
+* [ ] machinery — not implemented beyond Stage 3's pipe tile (M10)
+* [ ] atmosphere — no fog/weather/lighting effect exists (NS-15's tracked gap, Stage 2's sandstorm specifically)
 
 ## NS-M16-007 — Art consistency
 
-* [ ] 16-bit look
-* [ ] coherent palette
-* [ ] silhouettes
-* [ ] no modern HUD
-* [ ] no unnecessary gradients
-* [ ] no 3D
+* [x] 16-bit look — audited: every sprite/tile is a flat-fill indexed PNG, no photographic or high-color-depth assets anywhere
+* [x] coherent palette — audited: every PAL3-sharing asset verified byte-identical at shared indices throughout M05-M13 (the established `identify -verbose` technique)
+* [x] silhouettes — audited: every sprite is a simple geometric silhouette, no fine detail rendering
+* [x] no modern HUD — audited: HUD is plain monospace VDP text, no modern UI chrome/icons
+* [x] no unnecessary gradients — audited: every asset uses flat color fills only, zero gradients anywhere
+* [x] no 3D — audited: no 3D assets or perspective effects exist anywhere in the project
 
 ---
 

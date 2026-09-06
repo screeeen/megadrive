@@ -4,6 +4,9 @@
 
 // SPEC.md §11 gives HP/behavior/(most) scores; exact speeds, cooldowns and
 // Charger's score aren't specified there — chosen here, see PROGRESS.md.
+// M16: brief blink on a survived (non-lethal) hit.
+#define HIT_FLASH_FRAMES 6
+
 #define DRONE_SPEED     -3
 #define DRONE_HP         1
 #define DRONE_SCORE      100
@@ -102,6 +105,7 @@ Enemy* Enemy_spawn(EnemyType type, s16 x, s16 y)
         e->velocityY = 0;
         e->shootTimer = 0;
         e->stateTimer = 0;
+        e->hitFlashTimer = 0;
         e->vulnerable = TRUE;
 
         if (type == ENEMY_BOMBER || type == ENEMY_MINIBOSS)
@@ -285,6 +289,22 @@ void Enemy_poolUpdate(s16 playerX, s16 playerY)
             continue;
         }
 
+        // M16 "hit flash": a fast blink for a few frames after a survived
+        // (non-lethal) hit, then settles back to fully visible. Only
+        // touches SPR_setVisibility while actually flashing, or on the
+        // exact frame it finishes — calling it every single frame for
+        // every enemy regardless (the original version) was a real,
+        // avoidable per-frame cost across up to 12 enemies (found during
+        // M17's stress testing).
+        if (e->hitFlashTimer > 0)
+        {
+            e->hitFlashTimer--;
+            SPR_setVisibility(e->sprite, (e->hitFlashTimer & 1) ? HIDDEN : VISIBLE);
+
+            if (e->hitFlashTimer == 0)
+                SPR_setVisibility(e->sprite, VISIBLE);
+        }
+
         SPR_setPosition(e->sprite, e->x, e->y);
     }
 }
@@ -303,6 +323,10 @@ u16 Enemy_hit(Enemy* enemy, u8 damage)
         release(enemy);
         return score;
     }
+
+    // M16 "hit flash": a survived hit still gets brief visual feedback,
+    // toggled off in Enemy_poolUpdate().
+    enemy->hitFlashTimer = HIT_FLASH_FRAMES;
 
     return 0;
 }

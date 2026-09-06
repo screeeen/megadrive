@@ -21,4 +21,8 @@ void SpawnManager_update(void);
 bool SpawnManager_isComplete(void);
 u8 SpawnManager_getCheckpointsPassed(void);
 
+// M14 HUD: how far into the stage's timeline the current frame is, for a
+// "time/progress remaining" readout.
+u32 SpawnManager_getCurrentFrame(void);
+
 #endif // _SPAWN_MANAGER_H_

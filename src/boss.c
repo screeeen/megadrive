@@ -1,11 +1,10 @@
 #include "boss.h"
-#include "enemy.h"
-#include "bullet_pattern.h"
-#include "resources.h"
+#include "explosion.h"
 
-// SPEC.md §22 gives phase behaviors (cannons/drones/diagonal attacks) and
-// §40.8's overall timing budget, but not exact per-state frame counts —
-// chosen here, see PROGRESS.md.
+// SPEC.md §40.8 gives an overall timing budget but not exact per-state
+// frame counts — chosen here, see PROGRESS.md. Shared by every boss for
+// now (not yet a per-BossDef field: no two bosses exist yet to show that
+// this needs to vary — see PROGRESS.md).
 #define INTRO_FRAMES      60
 #define ATTACK_FRAMES     120
 #define ATTACK_FIRE_EVERY 30
@@ -13,11 +12,10 @@
 #define VULNERABLE_FRAMES 100
 #define TRANSITION_FRAMES 40
 #define DEATH_FRAMES      90
+#define DEATH_HIDE_FRAMES 20 // final stretch of DEATH: fully hidden, no more strobe
 
 #define BOSS_BATTLE_X 250
 #define BOSS_APPROACH_SPEED 2
-#define BULLET_SPEED  4
-#define BULLET_DAMAGE 2
 
 // SPEC.md §36: "mostrar claramente cuando es vulnerable". ATTACK and
 // VULNERABLE otherwise render as the identical solid, fully-visible sprite
@@ -36,6 +34,11 @@ static void enterAttack(Boss* boss)
     boss->state = BOSS_STATE_ATTACK;
     boss->timer = ATTACK_FRAMES;
     clearVulnerableText();
+
+    // TRANSITION's new phase-change blink (M16) can leave the sprite
+    // HIDDEN on whichever frame its timer happens to hit 0 — restore it
+    // here so ATTACK never silently starts invisible.
+    SPR_setVisibility(boss->spriteParts[0], VISIBLE);
 }
 
 static void enterTelegraph(Boss* boss)
@@ -64,56 +67,54 @@ static void enterDeath(Boss* boss)
 {
     boss->state = BOSS_STATE_DEATH;
     boss->timer = DEATH_FRAMES;
-    SPR_setVisibility(boss->spriteParts[0], HIDDEN);
     clearVulnerableText();
 }
 
-void Boss_spawn(Boss* boss, s16 x, s16 y, s16 maxHp, u16 score)
+void Boss_spawn(Boss* boss, const BossDef* def, s16 x, s16 y)
 {
+    // Defensive, same shape as the M07 pool bugfix (PROGRESS.md): if a
+    // previous encounter's sprite was somehow never released before this
+    // call, SPR_addSprite would allocate a second slot while this pointer
+    // gets silently overwritten below, orphaning the old one in SGDK's
+    // sprite engine instead of leaking cleanly.
+    if (boss->spriteParts[0])
+        SPR_releaseSprite(boss->spriteParts[0]);
+
     boss->active = TRUE;
     boss->x = x;
     boss->y = y;
-    boss->hp = maxHp;
-    boss->maxHp = maxHp;
+    boss->hp = def->maxHp;
+    boss->maxHp = def->maxHp;
     boss->phase = 1;
-    boss->score = score;
+    boss->score = def->score;
+    boss->def = def;
     boss->state = BOSS_STATE_INTRO;
     boss->timer = INTRO_FRAMES;
 
-    // 3 vulnerable points (SPEC.md §36: "3-5 puntos vulnerables"), all
-    // sharing the boss's single HP pool — see PROGRESS.md for why that's
-    // a deliberate simplification rather than per-point HP tracking.
-    boss->vulnerablePointCount = 3;
-    boss->vulnerablePoints[0].offsetX = 4;  boss->vulnerablePoints[0].offsetY = 12; boss->vulnerablePoints[0].w = 8; boss->vulnerablePoints[0].h = 8;
-    boss->vulnerablePoints[1].offsetX = 12; boss->vulnerablePoints[1].offsetY = 2;  boss->vulnerablePoints[1].w = 8; boss->vulnerablePoints[1].h = 8;
-    boss->vulnerablePoints[2].offsetX = 20; boss->vulnerablePoints[2].offsetY = 12; boss->vulnerablePoints[2].w = 8; boss->vulnerablePoints[2].h = 8;
-
     // Shares PAL3 with enemies/power-ups/background — see PROGRESS.md's
     // palette-budget notes; every M05+ placeholder was generated to match.
-    PAL_setPalette(PAL3, bossGuardian.palette->data, DMA);
-    boss->spriteParts[0] = SPR_addSprite(&bossGuardian, x, y, TILE_ATTR(PAL3, TRUE, FALSE, FALSE));
+    PAL_setPalette(PAL3, def->sprite->palette->data, DMA);
+
+    // SPR_addSprite (plain) can fail on VRAM fragmentation per SGDK's own
+    // header docs — SPR_addSpriteSafe retries once after SPR_defragVRAM().
+    // The boss is by far the largest single sprite in the game (32x32, 16
+    // tiles) and is repeatedly spawned/released across a play session
+    // (once per stage loop), making it the most fragmentation-sensitive
+    // allocation here: a failed plain alloc silently leaves spriteParts[0]
+    // NULL, and every later SPR_setPosition/SPR_setVisibility call on it
+    // corrupts SGDK's sprite engine state, crashing much later and
+    // somewhere unrelated (see PROGRESS.md's M09 crash investigation).
+    boss->spriteParts[0] = SPR_addSpriteSafe(def->sprite, x, y, TILE_ATTR(PAL3, TRUE, FALSE, FALSE));
 }
 
 static void fireAttackForPhase(const Boss* boss)
 {
-    s16 fireX = boss->x;
-    s16 fireY = (s16) (boss->y + (BOSS_SPRITE_H / 2));
+    const BossDef* def = boss->def;
 
-    switch (boss->phase)
-    {
-        case 1: // "canones frontales"
-            BulletPattern_diagonal(fireX, fireY, -1, 0, BULLET_SPEED, BULLET_DAMAGE);
-            break;
+    if (boss->phase == 0 || boss->phase > def->phaseCount)
+        return;
 
-        case 2: // "drones"
-            Enemy_spawn(ENEMY_DRONE, fireX, (s16) (boss->y + 4));
-            break;
-
-        default: // 3: "ataques diagonales"
-            BulletPattern_diagonal(fireX, fireY, -1, -1, BULLET_SPEED, BULLET_DAMAGE);
-            BulletPattern_diagonal(fireX, fireY, -1,  1, BULLET_SPEED, BULLET_DAMAGE);
-            break;
-    }
+    def->phaseAttacks[boss->phase - 1](boss);
 }
 
 void Boss_update(Boss* boss, s16 playerX, s16 playerY)
@@ -161,11 +162,39 @@ void Boss_update(Boss* boss, s16 playerX, s16 playerY)
             break;
 
         case BOSS_STATE_TRANSITION:
+        {
+            // M16: a fast blink (distinct from TELEGRAPH's slower one) as
+            // the "phase changed" warning — TRANSITION previously looked
+            // identical to a solid ATTACK/VULNERABLE boss.
+            bool blinkVisible = ((boss->timer / 4) & 1) == 0;
+            SPR_setVisibility(boss->spriteParts[0], blinkVisible ? VISIBLE : HIDDEN);
+
             if (--boss->timer == 0)
                 enterAttack(boss);
             break;
+        }
 
         case BOSS_STATE_DEATH:
+            // A fast strobe of the boss's own sprite (M09), now paired
+            // with real explosion sprites (M16's explosion.c) spawned at
+            // scattered points across its footprint every 15 frames — a
+            // proper death sequence instead of just the strobe alone.
+            // Settles into fully hidden for the final stretch before the
+            // STAGE_CLEAR/ENDING transition.
+            if (boss->timer > DEATH_HIDE_FRAMES)
+            {
+                SPR_setVisibility(boss->spriteParts[0], ((boss->timer / 4) & 1) ? VISIBLE : HIDDEN);
+
+                if ((boss->timer % 15) == 0)
+                {
+                    s16 offsetX = (s16) ((boss->timer * 7) % BOSS_SPRITE_W);
+                    s16 offsetY = (s16) ((boss->timer * 5) % BOSS_SPRITE_H);
+                    Explosion_spawn((s16) (boss->x + offsetX), (s16) (boss->y + offsetY));
+                }
+            }
+            else
+                SPR_setVisibility(boss->spriteParts[0], HIDDEN);
+
             if (--boss->timer == 0)
                 boss->active = FALSE;
             break;

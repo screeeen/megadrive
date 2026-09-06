@@ -3,6 +3,8 @@
 #include "projectile.h"
 #include "combo.h"
 #include "score.h"
+#include "audio.h"
+#include "explosion.h"
 
 // Not specified exactly in SPEC.md ("alto dano", "~0.5 segundos") — chosen
 // here, see PROGRESS.md. 10 comfortably exceeds Shield's 6 max HP, the
@@ -14,6 +16,8 @@ bool Bomb_use(Player* player)
 {
     if (!Player_useBomb(player))
         return FALSE;
+
+    Audio_playSfx(SFX_BOMB);
 
     Enemy* enemies = Enemy_getPool();
 
@@ -30,12 +34,15 @@ bool Bomb_use(Player* player)
         if (e->type == ENEMY_SHIELD)
             e->vulnerable = TRUE;
 
+        s16 deathX = e->x;
+        s16 deathY = e->y;
         u16 scoreGained = Enemy_hit(e, BOMB_DAMAGE);
 
         if (scoreGained > 0)
         {
             Score_add((u16) (scoreGained * Combo_getMultiplier()));
             Combo_onKill();
+            Explosion_spawn(deathX, deathY);
         }
     }
 

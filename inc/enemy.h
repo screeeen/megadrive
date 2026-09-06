@@ -48,6 +48,7 @@ typedef struct
     u16 shootTimer;
     u16 stateTimer; // generic per-type countdown (Charger's pause/charge phases)
     bool vulnerable; // Shield only: false while its frontal armor blocks damage
+    u8 hitFlashTimer; // M16: brief visibility blink on a non-lethal hit
 
     Sprite* sprite;
 } Enemy;

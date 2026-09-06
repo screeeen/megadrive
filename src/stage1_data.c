@@ -85,5 +85,5 @@ const StageDef stage1 = {
     { 7680, 14400 },                                 // checkpointFrames: ~40%, ~75% of 19200
     1,                                                // bossId: Orbital Guardian (game_state.c's only boss so far)
     1,                                                // backgroundId: Orbital City (space + buildings placeholder)
-    0                                                 // musicId (M15)
+    1                                                 // musicId: Orbital City theme (audio.c)
 };

@@ -3,11 +3,13 @@
 
 #include <genesis.h>
 
-// Minimal score tracking so NS-M05's "scoring works" is real and visible
-// now, via the debug HUD. The full HUD format (SPEC.md §22: SCORE/HI/etc.)
-// is M14's job — this is deliberately not that, just Score_add/Score_get.
 void Score_reset(void);
 void Score_add(u16 points);
 u32 Score_get(void);
+
+// SPEC.md §14/M14: the session's highest score reached so far. Never
+// reset by Score_reset() (a new game shouldn't erase it) — only power-
+// cycling the console does, since no save mechanism exists (NS-17).
+u32 Score_getHigh(void);
 
 #endif // _SCORE_H_
