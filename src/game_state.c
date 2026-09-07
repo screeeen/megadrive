@@ -28,6 +28,14 @@
 // SPEC.md §26: 3 initial continues per campaign.
 #define INITIAL_CONTINUES 3
 
+// User-requested: a random lightning-flash effect during Stage 1
+// (Orbital City) — not tied to any SPEC.md requirement (the storm
+// mechanic SPEC.md §17 actually describes belongs to Stage 2, Red
+// Desert), purely an atmospheric touch for this specific stage.
+#define LIGHTNING_STAGE_BACKGROUND_ID 1
+#define LIGHTNING_CHANCE_DIVISOR 40 // ~1-in-240 chance per frame, averaging one flash every ~4s at 60Hz
+#define LIGHTNING_FRAMES 24
+
 #define BOMB_FLASH_FRAMES 20 // how long the "BOMB!" feedback text stays up
 
 // Where the boss's INTRO approach starts from — the boss's own HP/score/
@@ -454,6 +462,58 @@ static void drawStageProgress(void)
     VDP_drawText(buf, 1, 1);
 }
 
+// Briefly overwrites PAL0/PAL2/PAL3 (text, weapon, enemy/boss/background —
+// everything except the player) with pure white, then restores exactly
+// what was there, for a full-screen "lightning" flash. PAL1 (the player's
+// own, not shared with anything else) is deliberately skipped so the ship
+// keeps its normal colors and stays visible on top of the flash — user-
+// requested; enemies still flash too, since they share PAL3's actual
+// color indices with the background tiles (not just the hardware line),
+// and giving them their own line would need freeing one up elsewhere, a
+// bigger change than this (see PROGRESS.md's M16+ palette-budget notes).
+// Only active while Stage 1 is the current stage (checked by
+// backgroundId, the same field Scroll_init() already uses to identify
+// it) — random, a few frames long, self-restoring.
+static void updateLightning(void)
+{
+    static u16 paletteBackup[64]; // indices 0-15 (PAL0) and 32-63 (PAL2/PAL3) are used; 16-31 (PAL1) stays stale/unused
+    static u8 lightningTimer;
+
+    if (currentStage->backgroundId != LIGHTNING_STAGE_BACKGROUND_ID)
+        return;
+
+    if (lightningTimer > 0)
+    {
+        if (--lightningTimer == 0)
+        {
+            PAL_setColors(0, paletteBackup, 16, DMA);
+            PAL_setColors(32, paletteBackup + 32, 32, DMA);
+        }
+
+        return;
+    }
+
+    if (random() % LIGHTNING_CHANCE_DIVISOR == 0)
+    {
+        static u16 whiteFlash[64];
+        static bool whiteFlashReady = FALSE;
+
+        if (!whiteFlashReady)
+        {
+            for (u8 i = 0; i < 64; i++)
+                whiteFlash[i] = 0x0EEE;
+
+            whiteFlashReady = TRUE;
+        }
+
+        PAL_getColors(0, paletteBackup, 16);
+        PAL_getColors(32, paletteBackup + 32, 32);
+        PAL_setColors(0, whiteFlash, 16, DMA);
+        PAL_setColors(32, whiteFlash, 32, DMA);
+        lightningTimer = LIGHTNING_FRAMES;
+    }
+}
+
 #if SHOW_DEBUG_HUD
 static void drawDebugHud(void)
 {
@@ -573,6 +633,7 @@ void GameState_update(void)
 
             drawHud();
             drawStageProgress();
+            updateLightning();
 #if SHOW_DEBUG_HUD
             drawDebugHud();
 #endif
@@ -647,6 +708,7 @@ void GameState_update(void)
             SPR_update();
 
             drawHud();
+            updateLightning();
 #if SHOW_DEBUG_HUD
             drawDebugHud();
 #endif
